@@ -1,4 +1,5 @@
 import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, RequestUrlParam, RequestUrlResponse, requestUrl, TFile } from 'obsidian';
+import { path } from 'path';
 
 // Remember to rename these classes and interfaces!
 
@@ -27,14 +28,9 @@ export default class MyPlugin extends Plugin {
 	async onload() {
 		await this.loadSettings();
 
-		// Let's create a relay.md folder already
-		// TODO: maybe make this one configurable!
-		try {await vault.createFolder(this.settings.vault_base_folder);} catch(e) {}
-
 		// This creates an icon in the left ribbon.
 		const ribbonIconEl = this.addRibbonIcon('dice', 'Sample Plugin', async (evt: MouseEvent) => {
-			// Called when the user clicks the icon.
-			await this.load_document("2b7ce5ca-dedd-40ae-abb4-ad58539a892c");
+			await this.get_recent_documents();
 		});
 
 		// This adds a settings tab so the user can configure various aspects of the plugin
@@ -53,8 +49,30 @@ export default class MyPlugin extends Plugin {
 		await this.saveData(this.settings);
 	}
 
+	async upsert_document(folder: str, filename: str, body: string) {
+		// FIXME: There is no way to check if a folder exists, so we just try create them
+		folder.split('/').reduce(
+			(directories, directory) => {
+				directories += `${directory}/`;
+				try {
+					this.app.vault.createFolder(directories);
+				} catch(e) {}
+				return directories;
+			},
+			'',
+		);
+		let full_path_to_file = folder + "/" + filename;
+		let fileRef : TFile = this.app.vault.getAbstractFileByPath(full_path_to_file);
+		if(fileRef === undefined || fileRef === null) {
+			await this.app.vault.create(full_path_to_file, body);
+			new Notice('File ' + full_path_to_file + ' has been created!');
+		} else {
+			// TODO: consider storing multiple versions of a file here!
+			await this.app.vault.modify(fileRef, body);
+			new Notice('File ' + full_path_to_file + ' has been modified!');
+		}
+	}
 	async load_document(id: string) {
-		const vault = this.app.vault;
 		const options: RequestUrlParam = {
 			url: this.settings.base_uri + '/v1/doc/' + id,
 			method: 'GET',
@@ -64,8 +82,13 @@ export default class MyPlugin extends Plugin {
 			},
 		}
 		var response: RequestUrlResponse;
+		response = await requestUrl(options);
+		if (response.status != 200) {
+			console.error("API server returned non-200 status code");
+			new Notice("Relay.md servers seem to be unavailable. Try again later");
+			return;
+		}
 		try {
-			response = await requestUrl(options);
 			let filename: string = response.headers["x-relay-filename"];
 			let relay_to: dict = JSON.parse(response.headers["x-relay-to"]);
 			let body : string = response.text;
@@ -75,25 +98,12 @@ export default class MyPlugin extends Plugin {
 				let tos: Array<string> = to.split("@", 2);
 				let team: string = tos[1];
 				let topic: string = tos[0];
-				let full_path_to_file: string;
+				let full_path_to_file: string = this.settings.vault_base_folder + "/";
 				// We ignore the "_" team which is a "global" team
-				if (team == "_") {
-					try {await vault.createFolder(this.settings.vault_base_folder + "/" + topic);} catch(e) {}
-					full_path_to_file = this.settings.vault_base_folder + "/" + topic + '/' + filename;
-				} else {
-					try {await vault.createFolder(this.settings.vault_base_folder + "/" + team);} catch(e) {}
-					try {await vault.createFolder(this.settings.vault_base_folder + "/" + team + "/" + topic);} catch(e) {}
-					full_path_to_file = this.settings.vault_base_folder + "/" + team + '/' + topic + '/' + filename;
-				}
-				let fileRef : TFile = vault.getAbstractFileByPath(full_path_to_file);
-				if(fileRef === undefined || fileRef === null) {
-					await vault.create(full_path_to_file, body);
-					new Notice('File ' + full_path_to_file + ' has been created!');
-				} else {
-					// TODO: consider storing multiple versions of a file here!
-					await vault.modify(fileRef, body);
-					new Notice('File ' + full_path_to_file + ' has been modified!');
-				}
+				if (team != "_")
+					full_path_to_file += team + "/";
+				full_path_to_file += topic;
+				this.upsert_document(full_path_to_file, filename, body);
 			}
 		} catch(e) {
 			console.log(JSON.stringify(e));
@@ -101,6 +111,32 @@ export default class MyPlugin extends Plugin {
 		}
 	}
 
+	async get_recent_documents() {
+		const options: RequestUrlParam = {
+			url: this.settings.base_uri + '/v1/docs',
+			method: 'GET',
+			headers: {
+				'X-API-KEY': this.settings.api_key,
+				'Content-Type': 'application/json'
+			},
+		}
+		var response: RequestUrlResponse;
+		response = await requestUrl(options);
+		if (response.status != 200) {
+			console.error("API server returned non-200 status code");
+			new Notice("Relay.md servers seem to be unavailable. Try again later");
+			return;
+		}
+		try {
+			response.json.result.map((item) => {
+				new Notice("Obtaining " + item.filename);
+				this.load_document(item.id);
+			})
+		} catch(e) {
+			console.log(JSON.stringify(e));
+			throw e;
+		}
+	}
 }
 
 class SampleModal extends Modal {
