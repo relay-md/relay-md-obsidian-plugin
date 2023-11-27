@@ -74,10 +74,10 @@ export default class MyPlugin extends Plugin {
 	async upsert_document(folder: str, filename: str, body: string) {
 		// FIXME: There is no way to check if a folder exists, so we just try create them
 		folder.split('/').reduce(
-			(directories, directory) => {
+			async (directories, directory) => {
 				directories += `${directory}/`;
 				try {
-					this.app.vault.createFolder(directories);
+					await this.app.vault.createFolder(directories);
 				} catch(e) {}
 				return directories;
 			},
@@ -151,9 +151,9 @@ export default class MyPlugin extends Plugin {
 			return;
 		}
 		try {
-			response.json.result.map((item) => {
+			response.json.result.map(async (item) => {
 				new Notice("Obtaining " + item.filename);
-				this.load_document(item.id);
+				await this.load_document(item.id);
 			})
 		} catch(e) {
 			console.log(JSON.stringify(e));
@@ -167,7 +167,7 @@ export default class MyPlugin extends Plugin {
 		var id = metadata.frontmatter["relay-id"]
 
 		var method = "POST";
-		var url = this.settings.base_uri + '/v1/doc?filename=' + encodeURIComponent(activeFile.path);
+		var url = this.settings.base_uri + '/v1/doc?filename=' + encodeURIComponent(activeFile.name);
 		if (id) {
 			method = "PATCH"
 			url = this.settings.base_uri + '/v1/doc/' + id;
