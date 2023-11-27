@@ -28,29 +28,34 @@ export default class MyPlugin extends Plugin {
 	async onload() {
 		await this.loadSettings();
 
-		// This creates an icon in the left ribbon.
-		this.addRibbonIcon('dice', 'Sample Plugin', async (evt: MouseEvent) => {
-			await this.get_recent_documents();
+		this.addCommand({
+			id: "relay-md-send-current-active-file",
+			name: "Relay.md: Send current open file",
+			callback: async () => {
+				new Notice("Sending document to relay.md");
+				const activeFile = this.app.workspace.getActiveFile();
+				if (!activeFile) {
+					return;
+				}
+				if (activeFile.extension !== "md") {
+					new Notice(
+						"The current file is not a markdown file. Please open a markdown file and try again.",
+					);
+					return;
+				}
+				await this.send_document(activeFile);
+			}
 		});
 
-		this.addRibbonIcon("dice", "Sample Plugin 2", async (evt: MouseEvent) => {
-			const { vault, workspace, metadataCache } = this.app;
-			new Notice("Adding publish flag to note and publishing it.");
-			const activeFile = workspace.getActiveFile();
-			if (!activeFile) {
-				return;
+		this.addCommand({
+			id: "relay-md-fetch-documents",
+			name: "Relay.md: Retreive recent files",
+			callback: async () => {
+				new Notice("Retreiving documents from relay.md");
+				await this.get_recent_documents();
 			}
-			if (activeFile.extension !== "md") {
-				new Notice(
-					"The current file is not a markdown file. Please open a markdown file and try again.",
-				);
-				return;
-			}
-			await this.publish_document(activeFile);
 		});
-		this.addSettingTab(new SampleSettingTab(this.app, this));
 
-		// This adds a settings tab so the user can configure various aspects of the plugin
 		this.addSettingTab(new SampleSettingTab(this.app, this));
 	}
 
@@ -89,6 +94,7 @@ export default class MyPlugin extends Plugin {
 			new Notice('File ' + full_path_to_file + ' has been modified!');
 		}
 	}
+
 	async load_document(id: string) {
 		const options: RequestUrlParam = {
 			url: this.settings.base_uri + '/v1/doc/' + id,
@@ -155,13 +161,19 @@ export default class MyPlugin extends Plugin {
 		}
 	}
 
-	async publish_document(activeFile) {
+	async send_document(activeFile) {
 		var body = await this.app.vault.cachedRead(activeFile);
 		var metadata = this.app.metadataCache.getCache(activeFile.path);
-		metadata.frontmatter["hello"] = "world";
-		console.log(metadata.frontmatter);
+		var id = metadata.frontmatter["relay-id"]
+
+		var method = "POST";
+		var url = this.settings.base_uri + '/v1/doc?filename=' + encodeURIComponent(activeFile.path);
+		if (id) {
+			method = "PATCH"
+			url = this.settings.base_uri + '/v1/doc/' + id;
+		}
 		const options: RequestUrlParam = {
-			url: this.settings.base_uri + '/v1/doc?filename=' + encodeURIComponent(activeFile.path),
+			url: url,
 			method: 'POST',
 			headers: {
 				'X-API-KEY': this.settings.api_key,
@@ -169,18 +181,21 @@ export default class MyPlugin extends Plugin {
 			},
 			body: body,
 		}
-		var response: RequestUrlResponse;
-		response = await requestUrl(options);
+		var response: RequestUrlResponse = await requestUrl(options);
 		if (response.status != 200) {
 			console.error("API server returned non-200 status code");
 			new Notice("Relay.md servers seem to be unavailable. Try again later");
 			return;
 		}
-		try {
-			console.log(response.json)
-		} catch(e) {
-			console.log(JSON.stringify(e));
-			throw e;
+
+		// new document -> store id in frontmatter
+		if (!id) {
+			// Get document id
+			var doc_id = response.json.result.id;  // FIXME: prolly needs change of id key
+			// update document to contain new document id
+			app.fileManager.processFrontMatter(activeFile, (frontmatter) => {
+				frontmatter["relay-id"] = doc_id;
+			});
 		}
 	}
 }
