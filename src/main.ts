@@ -29,9 +29,26 @@ export default class MyPlugin extends Plugin {
 		await this.loadSettings();
 
 		// This creates an icon in the left ribbon.
-		const ribbonIconEl = this.addRibbonIcon('dice', 'Sample Plugin', async (evt: MouseEvent) => {
+		this.addRibbonIcon('dice', 'Sample Plugin', async (evt: MouseEvent) => {
 			await this.get_recent_documents();
 		});
+
+		this.addRibbonIcon("dice", "Sample Plugin 2", async (evt: MouseEvent) => {
+			const { vault, workspace, metadataCache } = this.app;
+			new Notice("Adding publish flag to note and publishing it.");
+			const activeFile = workspace.getActiveFile();
+			if (!activeFile) {
+				return;
+			}
+			if (activeFile.extension !== "md") {
+				new Notice(
+					"The current file is not a markdown file. Please open a markdown file and try again.",
+				);
+				return;
+			}
+			await this.publish_document(activeFile);
+		});
+		this.addSettingTab(new SampleSettingTab(this.app, this));
 
 		// This adds a settings tab so the user can configure various aspects of the plugin
 		this.addSettingTab(new SampleSettingTab(this.app, this));
@@ -132,6 +149,35 @@ export default class MyPlugin extends Plugin {
 				new Notice("Obtaining " + item.filename);
 				this.load_document(item.id);
 			})
+		} catch(e) {
+			console.log(JSON.stringify(e));
+			throw e;
+		}
+	}
+
+	async publish_document(activeFile) {
+		var body = await this.app.vault.cachedRead(activeFile);
+		var metadata = this.app.metadataCache.getCache(activeFile.path);
+		metadata.frontmatter["hello"] = "world";
+		console.log(metadata.frontmatter);
+		const options: RequestUrlParam = {
+			url: this.settings.base_uri + '/v1/doc?filename=' + encodeURIComponent(activeFile.path),
+			method: 'POST',
+			headers: {
+				'X-API-KEY': this.settings.api_key,
+				'Content-Type': 'text/markdown'
+			},
+			body: body,
+		}
+		var response: RequestUrlResponse;
+		response = await requestUrl(options);
+		if (response.status != 200) {
+			console.error("API server returned non-200 status code");
+			new Notice("Relay.md servers seem to be unavailable. Try again later");
+			return;
+		}
+		try {
+			console.log(response.json)
 		} catch(e) {
 			console.log(JSON.stringify(e));
 			throw e;
