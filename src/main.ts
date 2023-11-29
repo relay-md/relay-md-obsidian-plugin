@@ -43,7 +43,13 @@ export default class MyPlugin extends Plugin {
 					);
 					return;
 				}
-				await this.send_document(activeFile);
+				if (activeFile.path.startsWith(this.settings.vault_base_folder)) {
+					new Notice(
+						"Files from the relay.md base folder cannot be sent."
+					);
+				} else {
+					await this.send_document(activeFile);
+				}
 			}
 		});
 
@@ -74,10 +80,10 @@ export default class MyPlugin extends Plugin {
 	async upsert_document(folder: str, filename: str, body: string) {
 		// FIXME: There is no way to check if a folder exists, so we just try create them
 		folder.split('/').reduce(
-			async (directories, directory) => {
+			(directories, directory) => {
 				directories += `${directory}/`;
 				try {
-					await this.app.vault.createFolder(directories);
+					this.app.vault.createFolder(directories);
 				} catch(e) {}
 				return directories;
 			},
