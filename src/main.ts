@@ -119,9 +119,9 @@ export default class RelayMdPLugin extends Plugin {
 			},
 		}
 		const response: RequestUrlResponse = await requestUrl(options);
-		if (response.status != 200) {
-			console.error("API server returned non-200 status code");
-			new Notice("Relay.md servers seem to be unavailable. Try again later");
+		if (response.json.error) {
+			console.error("API server returned an error");
+			new Notice("Relay.md returned an error: " + response.json.error.message);
 			return;
 		}
 		try {
@@ -157,9 +157,9 @@ export default class RelayMdPLugin extends Plugin {
 			},
 		}
 		const response: RequestUrlResponse = await requestUrl(options);
-		if (response.status != 200) {
-			console.error("API server returned non-200 status code");
-			new Notice("Relay.md servers seem to be unavailable. Try again later");
+		if (response.json.error) {
+			console.error("API server returned an error");
+			new Notice("Relay.md returned an error: " + response.json.error.message);
 			return;
 		}
 		try {
@@ -204,9 +204,9 @@ export default class RelayMdPLugin extends Plugin {
 			body: body,
 		}
 		const response: RequestUrlResponse = await requestUrl(options);
-		if (response.status != 200) {
-			console.error("API server returned non-200 status code");
-			new Notice("Relay.md servers seem to be unavailable. Try again later");
+		if (response.json.error) {
+			console.error("API server returned an error");
+			new Notice("Relay.md returned an error: " + response.json.error.message);
 			return;
 		}
 
