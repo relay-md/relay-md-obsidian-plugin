@@ -68,6 +68,9 @@ var RelayMdPLugin = class extends import_obsidian.Plugin {
         await this.get_recent_documents();
       }
     });
+    this.registerInterval(window.setInterval(() => {
+      this.get_recent_documents();
+    }, 5 * 60 * 1e3));
     this.addSettingTab(new RelayMDSettingTab(this.app, this));
   }
   onunload() {
