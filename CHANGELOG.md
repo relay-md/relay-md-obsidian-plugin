@@ -1,3 +1,10 @@
+## [1.1.5](https://github.com/relay-md/relay-md-obsidian-plugin/compare/1.1.4...1.1.5) (2023-12-01)
+
+
+### Bug Fixes
+
+* **build:** also add manifest to releases ([0035f97](https://github.com/relay-md/relay-md-obsidian-plugin/commit/0035f97d8c2ffeba7e85b14110d6bc61d8d93072))
+
 ## [1.1.4](https://github.com/relay-md/relay-md-obsidian-plugin/compare/1.1.3...1.1.4) (2023-12-01)
 
 
