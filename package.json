@@ -31,6 +31,7 @@
 		"eslint": "^8.54.0"
 	},
 	"release": {
+		"tagFormat": "${version}",
 		"branches": [
 			"master"
 		],
@@ -58,7 +59,17 @@
 			[
 				"@semantic-release/github",
 				{
-					"addReleases": true
+					"addReleases": true,
+					"assets": [
+						{
+							"path": [
+								"main.js",
+								"manifest.json",
+								"styles.css"
+							],
+							"label": "Plugin Release"
+						}
+					]
 				}
 			]
 		]
