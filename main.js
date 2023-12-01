@@ -24,7 +24,7 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 // src/main.ts
 var main_exports = {};
 __export(main_exports, {
-  default: () => MyPlugin
+  default: () => RelayMdPLugin
 });
 module.exports = __toCommonJS(main_exports);
 var import_obsidian = require("obsidian");
@@ -33,7 +33,7 @@ var DEFAULT_SETTINGS = {
   api_key: "00000000-0000-0000-0000-000000000000",
   vault_base_folder: "relay.md"
 };
-var MyPlugin = class extends import_obsidian.Plugin {
+var RelayMdPLugin = class extends import_obsidian.Plugin {
   async onload() {
     await this.loadSettings();
     this.addCommand({
@@ -90,7 +90,7 @@ var MyPlugin = class extends import_obsidian.Plugin {
       },
       ""
     );
-    const full_path_to_file = folder + "/" + filename;
+    const full_path_to_file = (0, import_obsidian.normalizePath)(folder + "/" + filename);
     const fileRef = this.app.vault.getAbstractFileByPath(full_path_to_file);
     if (fileRef === void 0 || fileRef === null) {
       await this.app.vault.create(full_path_to_file, body);
