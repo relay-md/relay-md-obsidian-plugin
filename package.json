@@ -48,6 +48,7 @@
 				"@semantic-release/git",
 				{
 					"assets": [
+						"manifest.json",
 						"versions.json",
 						"CHANGELOG.md",
 						"main.js"
