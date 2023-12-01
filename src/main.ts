@@ -69,7 +69,7 @@ export default class MyPlugin extends Plugin {
 		await this.saveData(this.settings);
 	}
 
-	async upsert_document(folder: str, filename: str, body: string) {
+	async upsert_document(folder: string, filename: string, body: string) {
 		// FIXME: There is no way to check if a folder exists, so we just try create them
 		folder.split('/').reduce(
 			(directories, directory) => {
@@ -84,11 +84,11 @@ export default class MyPlugin extends Plugin {
 			'',
 		);
 		const full_path_to_file = folder + "/" + filename;
-		const fileRef : TFile = this.app.vault.getAbstractFileByPath(full_path_to_file);
+		const fileRef = this.app.vault.getAbstractFileByPath(full_path_to_file);
 		if(fileRef === undefined || fileRef === null) {
 			await this.app.vault.create(full_path_to_file, body);
 			new Notice('File ' + full_path_to_file + ' has been created!');
-		} else {
+		} else if(fileRef instanceof TFile) {
 			// TODO: consider storing multiple versions of a file here!
 			await this.app.vault.modify(fileRef, body);
 			new Notice('File ' + full_path_to_file + ' has been modified!');
@@ -112,7 +112,7 @@ export default class MyPlugin extends Plugin {
 		}
 		try {
 			const filename: string = response.headers["x-relay-filename"];
-			const relay_to: dict = JSON.parse(response.headers["x-relay-to"]);
+			const relay_to = JSON.parse(response.headers["x-relay-to"]);
 			const body : string = response.text;
 
 			// Loop through team/topics
@@ -149,7 +149,8 @@ export default class MyPlugin extends Plugin {
 			return;
 		}
 		try {
-			response.json.result.map(async (item) => {
+			// TODO: might want to make the interface clear to get rid of "any" type
+			response.json.result.map(async (item: any) => {
 				new Notice("Obtaining " + item.filename);
 				await this.load_document(item.id);
 			})
@@ -159,9 +160,18 @@ export default class MyPlugin extends Plugin {
 		}
 	}
 
-	async send_document(activeFile) {
+	// TODO: might want to make the interface clear to get rid of "any" type
+	async send_document(activeFile: any) {
 		const body = await this.app.vault.cachedRead(activeFile);
 		const metadata = this.app.metadataCache.getCache(activeFile.path);
+		if (metadata === null || metadata === undefined) {
+			// There is no metadata so it cannot possibly be shared with anyone
+			return;
+		}
+		if (metadata.frontmatter === null || metadata.frontmatter === undefined) {
+			// There is no frontmatter so it cannot possibly be shared with anyone
+			return;
+		}
 		const id = metadata.frontmatter["relay-id"]
 
 		let method = "POST";
