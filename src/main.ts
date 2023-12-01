@@ -1,5 +1,4 @@
-import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, RequestUrlParam, RequestUrlResponse, requestUrl, TFile } from 'obsidian';
-import { path } from 'path';
+import { App, Notice, Plugin, PluginSettingTab, Setting, RequestUrlParam, RequestUrlResponse, requestUrl, TFile } from 'obsidian';
 
 // Remember to rename these classes and interfaces!
 
@@ -13,13 +12,6 @@ const DEFAULT_SETTINGS: MyPluginSettings = {
 	base_uri: 'https://api.relay.md',
 	api_key: '00000000-0000-0000-0000-000000000000',
 	vault_base_folder: "relay.md"
-}
-
-class Document {
-	id: string;
-	constructor(id: string) {
-		this.id = id;
-	}
 }
 
 export default class MyPlugin extends Plugin {
@@ -62,7 +54,7 @@ export default class MyPlugin extends Plugin {
 			}
 		});
 
-		this.addSettingTab(new SampleSettingTab(this.app, this));
+		this.addSettingTab(new RelayMDSettingTab(this.app, this));
 	}
 
 	onunload() {
@@ -84,13 +76,15 @@ export default class MyPlugin extends Plugin {
 				directories += `${directory}/`;
 				try {
 					this.app.vault.createFolder(directories);
-				} catch(e) {}
+				} catch(e) {
+					// do nothing
+				}
 				return directories;
 			},
 			'',
 		);
-		let full_path_to_file = folder + "/" + filename;
-		let fileRef : TFile = this.app.vault.getAbstractFileByPath(full_path_to_file);
+		const full_path_to_file = folder + "/" + filename;
+		const fileRef : TFile = this.app.vault.getAbstractFileByPath(full_path_to_file);
 		if(fileRef === undefined || fileRef === null) {
 			await this.app.vault.create(full_path_to_file, body);
 			new Notice('File ' + full_path_to_file + ' has been created!');
@@ -110,23 +104,22 @@ export default class MyPlugin extends Plugin {
 				'Content-Type': 'text/markdown'
 			},
 		}
-		var response: RequestUrlResponse;
-		response = await requestUrl(options);
+		const response: RequestUrlResponse = await requestUrl(options);
 		if (response.status != 200) {
 			console.error("API server returned non-200 status code");
 			new Notice("Relay.md servers seem to be unavailable. Try again later");
 			return;
 		}
 		try {
-			let filename: string = response.headers["x-relay-filename"];
-			let relay_to: dict = JSON.parse(response.headers["x-relay-to"]);
-			let body : string = response.text;
+			const filename: string = response.headers["x-relay-filename"];
+			const relay_to: dict = JSON.parse(response.headers["x-relay-to"]);
+			const body : string = response.text;
 
 			// Loop through team/topics
-			for (let to of relay_to) {
-				let tos: Array<string> = to.split("@", 2);
-				let team: string = tos[1];
-				let topic: string = tos[0];
+			for (const to of relay_to) {
+				const tos: Array<string> = to.split("@", 2);
+				const team: string = tos[1];
+				const topic: string = tos[0];
 				let full_path_to_file: string = this.settings.vault_base_folder + "/";
 				// We ignore the "_" team which is a "global" team
 				if (team != "_")
@@ -149,8 +142,7 @@ export default class MyPlugin extends Plugin {
 				'Content-Type': 'application/json'
 			},
 		}
-		var response: RequestUrlResponse;
-		response = await requestUrl(options);
+		const response: RequestUrlResponse = await requestUrl(options);
 		if (response.status != 200) {
 			console.error("API server returned non-200 status code");
 			new Notice("Relay.md servers seem to be unavailable. Try again later");
@@ -168,26 +160,26 @@ export default class MyPlugin extends Plugin {
 	}
 
 	async send_document(activeFile) {
-		var body = await this.app.vault.cachedRead(activeFile);
-		var metadata = this.app.metadataCache.getCache(activeFile.path);
-		var id = metadata.frontmatter["relay-id"]
+		const body = await this.app.vault.cachedRead(activeFile);
+		const metadata = this.app.metadataCache.getCache(activeFile.path);
+		const id = metadata.frontmatter["relay-id"]
 
-		var method = "POST";
-		var url = this.settings.base_uri + '/v1/doc?filename=' + encodeURIComponent(activeFile.name);
+		let method = "POST";
+		let url = this.settings.base_uri + '/v1/doc?filename=' + encodeURIComponent(activeFile.name);
 		if (id) {
 			method = "PATCH"
 			url = this.settings.base_uri + '/v1/doc/' + id;
 		}
 		const options: RequestUrlParam = {
 			url: url,
-			method: 'POST',
+			method: method,
 			headers: {
 				'X-API-KEY': this.settings.api_key,
 				'Content-Type': 'text/markdown'
 			},
 			body: body,
 		}
-		var response: RequestUrlResponse = await requestUrl(options);
+		const response: RequestUrlResponse = await requestUrl(options);
 		if (response.status != 200) {
 			console.error("API server returned non-200 status code");
 			new Notice("Relay.md servers seem to be unavailable. Try again later");
@@ -197,7 +189,7 @@ export default class MyPlugin extends Plugin {
 		// new document -> store id in frontmatter
 		if (!id) {
 			// Get document id
-			var doc_id = response.json.result.id;  // FIXME: prolly needs change of id key
+			const doc_id = response.json.result.id;  // FIXME: prolly needs change of id key
 			// update document to contain new document id
 			app.fileManager.processFrontMatter(activeFile, (frontmatter) => {
 				frontmatter["relay-id"] = doc_id;
@@ -206,23 +198,7 @@ export default class MyPlugin extends Plugin {
 	}
 }
 
-class SampleModal extends Modal {
-	constructor(app: App) {
-		super(app);
-	}
-
-	onOpen() {
-		const {contentEl} = this;
-		contentEl.setText('Woah!');
-	}
-
-	onClose() {
-		const {contentEl} = this;
-		contentEl.empty();
-	}
-}
-
-class SampleSettingTab extends PluginSettingTab {
+class RelayMDSettingTab extends PluginSettingTab {
 	plugin: MyPlugin;
 
 	constructor(app: App, plugin: MyPlugin) {
