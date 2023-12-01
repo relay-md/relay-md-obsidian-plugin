@@ -63,6 +63,11 @@ export default class RelayMdPLugin extends Plugin {
 			}
 		});
 
+		// Additionally, we register a timer to fetch documents for us
+		this.registerInterval(window.setInterval(() => {
+				this.get_recent_documents();
+			}, 5 * 60 * 1000));  // 5 minutes
+
 		this.addSettingTab(new RelayMDSettingTab(this.app, this));
 	}
 
