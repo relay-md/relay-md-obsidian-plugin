@@ -65,6 +65,13 @@
 							"path": "dist/release.zip",
 							"name": "obsidian-plugin-${nextRelease.gitTag}.zip",
 							"label": "Obsidian Plugin Bundle (${nextRelease.gitTag})"
+						},
+						{
+							"path": [
+								"manifest.json",
+								"main.js",
+								"styles.css"
+							]
 						}
 					]
 				}
