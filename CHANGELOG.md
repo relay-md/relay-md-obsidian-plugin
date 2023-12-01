@@ -1,3 +1,10 @@
+## [1.1.7](https://github.com/relay-md/relay-md-obsidian-plugin/compare/1.1.6...1.1.7) (2023-12-01)
+
+
+### Bug Fixes
+
+* no use of plugin in name ([1773d90](https://github.com/relay-md/relay-md-obsidian-plugin/commit/1773d90cf25b647e2dbcb4d7fc656d633da3f75d))
+
 ## [1.1.6](https://github.com/relay-md/relay-md-obsidian-plugin/compare/1.1.5...1.1.6) (2023-12-01)
 
 
