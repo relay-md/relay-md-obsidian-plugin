@@ -34,16 +34,28 @@
 		"plugins": [
 			"@semantic-release/commit-analyzer",
 			"@semantic-release/release-notes-generator",
-			[
-				"@semantic-release/github",
-				{
-					"addReleases": true
-				}
-			],
+			"@semantic-release/changelog",
 			[
 				"@semantic-release/exec",
 				{
 					"prepareCmd": "./release.sh ${nextRelease.version}"
+				}
+			],
+			[
+				"@semantic-release/git",
+				{
+					"assets": [
+						"versions.json",
+						"CHANGELOG.md",
+						"main.js"
+					],
+					"message": "chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
+				}
+			],
+			[
+				"@semantic-release/github",
+				{
+					"addReleases": true
 				}
 			]
 		]
