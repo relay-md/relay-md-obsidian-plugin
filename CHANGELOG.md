@@ -1,3 +1,10 @@
+## [1.1.8](https://github.com/relay-md/relay-md-obsidian-plugin/compare/1.1.7...1.1.8) (2023-12-01)
+
+
+### Bug Fixes
+
+* maybe author needs to be xeroc ([1b40b5b](https://github.com/relay-md/relay-md-obsidian-plugin/commit/1b40b5b5990015d783ed112e7581d9113e7f0f50))
+
 ## [1.1.7](https://github.com/relay-md/relay-md-obsidian-plugin/compare/1.1.6...1.1.7) (2023-12-01)
 
 
