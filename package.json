@@ -35,6 +35,12 @@
 			"@semantic-release/commit-analyzer",
 			"@semantic-release/release-notes-generator",
 			[
+				"@semantic-release/github",
+				{
+					"addReleases": true
+				}
+			],
+			[
 				"@semantic-release/exec",
 				{
 					"prepareCmd": "./release.sh ${nextRelease.version}"
