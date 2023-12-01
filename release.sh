@@ -10,3 +10,6 @@ fi
 TEMPFILE=$(mktemp)
 cp versions.json $TEMPFILE
 jq '."'$1'" = "'$REQUIRED_OBSIDIAN_VERSION'"' $TEMPFILE >versions.json
+
+# Now lets zip the files
+zip dist/release.zip main.js manifest.json styles.css

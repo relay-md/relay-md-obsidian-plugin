@@ -62,12 +62,9 @@
 					"addReleases": true,
 					"assets": [
 						{
-							"path": [
-								"main.js",
-								"manifest.json",
-								"styles.css"
-							],
-							"label": "Plugin Release"
+							"path": "dist/release.zip",
+							"name": "obsidian-plugin-${nextRelease.gitTag}.zip",
+							"label": "Obsidian Plugin Bundle (${nextRelease.gitTag})"
 						}
 					]
 				}
