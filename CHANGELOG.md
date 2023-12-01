@@ -1,3 +1,10 @@
+## [1.1.3](https://github.com/relay-md/relay-md-obsidian-plugin/compare/1.1.2...1.1.3) (2023-12-01)
+
+
+### Bug Fixes
+
+* force release ([8277af2](https://github.com/relay-md/relay-md-obsidian-plugin/commit/8277af2d1adafc4a450316c6c0a46acf557a81aa))
+
 ## [1.1.2](https://github.com/relay-md/relay-md-obsidian-plugin/compare/v1.1.1...v1.1.2) (2023-12-01)
 
 
