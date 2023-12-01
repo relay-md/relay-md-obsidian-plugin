@@ -1,3 +1,11 @@
+## [1.1.4](https://github.com/relay-md/relay-md-obsidian-plugin/compare/1.1.3...1.1.4) (2023-12-01)
+
+
+### Bug Fixes
+
+* **build:** properly build assets for releases ([88d2629](https://github.com/relay-md/relay-md-obsidian-plugin/commit/88d2629d8de4b99ec0aded3d1ef11c5b26880628))
+* **build:** use our release.sh instead of version-bump-mjs ([e4e117f](https://github.com/relay-md/relay-md-obsidian-plugin/commit/e4e117fa5c98b73cd46340aa94c60f324c0bd8fb))
+
 ## [1.1.3](https://github.com/relay-md/relay-md-obsidian-plugin/compare/1.1.2...1.1.3) (2023-12-01)
 
 
