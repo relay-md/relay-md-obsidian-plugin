@@ -1,21 +1,30 @@
-import { App, Notice, Plugin, PluginSettingTab, Setting, RequestUrlParam, RequestUrlResponse, requestUrl, TFile } from 'obsidian';
+import { 
+	App,
+	Notice,
+	Plugin,
+	PluginSettingTab,
+	Setting,
+	RequestUrlParam,
+	RequestUrlResponse,
+	requestUrl,
+	TFile,
+	normalizePath
+} from 'obsidian';
 
-// Remember to rename these classes and interfaces!
-
-interface MyPluginSettings {
+interface RelayMDSettings {
 	base_uri: string;
 	api_key: string;
 	vault_base_folder: string
 }
 
-const DEFAULT_SETTINGS: MyPluginSettings = {
+const DEFAULT_SETTINGS: RelayMDSettings = {
 	base_uri: 'https://api.relay.md',
 	api_key: '00000000-0000-0000-0000-000000000000',
 	vault_base_folder: "relay.md"
 }
 
-export default class MyPlugin extends Plugin {
-	settings: MyPluginSettings;
+export default class RelayMdPLugin extends Plugin {
+	settings: RelayMDSettings;
 
 	async onload() {
 		await this.loadSettings();
@@ -83,7 +92,7 @@ export default class MyPlugin extends Plugin {
 			},
 			'',
 		);
-		const full_path_to_file = folder + "/" + filename;
+		const full_path_to_file = normalizePath(folder + "/" + filename);
 		const fileRef = this.app.vault.getAbstractFileByPath(full_path_to_file);
 		if(fileRef === undefined || fileRef === null) {
 			await this.app.vault.create(full_path_to_file, body);
@@ -209,9 +218,9 @@ export default class MyPlugin extends Plugin {
 }
 
 class RelayMDSettingTab extends PluginSettingTab {
-	plugin: MyPlugin;
+	plugin: RelayMdPLugin;
 
-	constructor(app: App, plugin: MyPlugin) {
+	constructor(app: App, plugin: RelayMdPLugin) {
 		super(app, plugin);
 		this.plugin = plugin;
 	}
