@@ -113,11 +113,6 @@ var RelayMdPLugin = class extends import_obsidian.Plugin {
       }
     };
     const response = await (0, import_obsidian.requestUrl)(options);
-    if (response.status != 200) {
-      console.error("API server returned non-200 status code");
-      new import_obsidian.Notice("Relay.md servers seem to be unavailable. Try again later");
-      return;
-    }
     try {
       const filename = response.headers["x-relay-filename"];
       const relay_to = JSON.parse(response.headers["x-relay-to"]);
@@ -147,15 +142,16 @@ var RelayMdPLugin = class extends import_obsidian.Plugin {
       }
     };
     const response = await (0, import_obsidian.requestUrl)(options);
-    if (response.status != 200) {
-      console.error("API server returned non-200 status code");
-      new import_obsidian.Notice("Relay.md servers seem to be unavailable. Try again later");
+    if (response.json.error) {
+      console.error("API server returned an error");
+      new import_obsidian.Notice("Relay.md returned an error: " + response.json.error.message);
       return;
     }
     try {
       response.json.result.map(async (item) => {
-        new import_obsidian.Notice("Obtaining " + item.filename);
-        await this.load_document(item.id);
+        console.log(item);
+        new import_obsidian.Notice("Obtaining " + item["relay-filename"]);
+        await this.load_document(item["relay-document"]);
       });
     } catch (e) {
       console.log(JSON.stringify(e));
@@ -172,11 +168,11 @@ var RelayMdPLugin = class extends import_obsidian.Plugin {
     if (metadata.frontmatter === null || metadata.frontmatter === void 0) {
       return;
     }
-    const id = metadata.frontmatter["relay-id"];
+    const id = metadata.frontmatter["relay-document"];
     let method = "POST";
     let url = this.settings.base_uri + "/v1/doc?filename=" + encodeURIComponent(activeFile.name);
     if (id) {
-      method = "PATCH";
+      method = "PUT";
       url = this.settings.base_uri + "/v1/doc/" + id;
     }
     const options = {
@@ -189,17 +185,15 @@ var RelayMdPLugin = class extends import_obsidian.Plugin {
       body
     };
     const response = await (0, import_obsidian.requestUrl)(options);
-    if (response.status != 200) {
-      console.error("API server returned non-200 status code");
-      new import_obsidian.Notice("Relay.md servers seem to be unavailable. Try again later");
+    if (response.json.error) {
+      console.error("API server returned an error");
+      new import_obsidian.Notice("Relay.md returned an error: " + response.json.error.message);
       return;
     }
-    if (!id) {
-      const doc_id = response.json.result.id;
-      app.fileManager.processFrontMatter(activeFile, (frontmatter) => {
-        frontmatter["relay-id"] = doc_id;
-      });
-    }
+    const doc_id = response.json.result["relay-document"];
+    app.fileManager.processFrontMatter(activeFile, (frontmatter) => {
+      frontmatter["relay-document"] = doc_id;
+    });
   }
 };
 var RelayMDSettingTab = class extends import_obsidian.PluginSettingTab {
