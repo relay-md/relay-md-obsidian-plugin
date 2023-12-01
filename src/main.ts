@@ -119,11 +119,8 @@ export default class RelayMdPLugin extends Plugin {
 			},
 		}
 		const response: RequestUrlResponse = await requestUrl(options);
-		if (response.json.error) {
-			console.error("API server returned an error");
-			new Notice("Relay.md returned an error: " + response.json.error.message);
-			return;
-		}
+		// we do not look for error in json response as we do not get a json
+		// response but markdown in the body
 		try {
 			const filename: string = response.headers["x-relay-filename"];
 			const relay_to = JSON.parse(response.headers["x-relay-to"]);
@@ -165,8 +162,9 @@ export default class RelayMdPLugin extends Plugin {
 		try {
 			// TODO: might want to make the interface clear to get rid of "any" type
 			response.json.result.map(async (item: any) => {
-				new Notice("Obtaining " + item.filename);
-				await this.load_document(item.id);
+				console.log(item);
+				new Notice("Obtaining " + item["relay-filename"]);
+				await this.load_document(item["relay-document"]);
 			})
 		} catch(e) {
 			console.log(JSON.stringify(e));
@@ -186,12 +184,12 @@ export default class RelayMdPLugin extends Plugin {
 			// There is no frontmatter so it cannot possibly be shared with anyone
 			return;
 		}
-		const id = metadata.frontmatter["relay-id"]
+		const id = metadata.frontmatter["relay-document"]
 
 		let method = "POST";
 		let url = this.settings.base_uri + '/v1/doc?filename=' + encodeURIComponent(activeFile.name);
 		if (id) {
-			method = "PATCH"
+			method = "PUT"
 			url = this.settings.base_uri + '/v1/doc/' + id;
 		}
 		const options: RequestUrlParam = {
@@ -211,14 +209,13 @@ export default class RelayMdPLugin extends Plugin {
 		}
 
 		// new document -> store id in frontmatter
-		if (!id) {
-			// Get document id
-			const doc_id = response.json.result.id;  // FIXME: prolly needs change of id key
-			// update document to contain new document id
-			app.fileManager.processFrontMatter(activeFile, (frontmatter) => {
-				frontmatter["relay-id"] = doc_id;
-			});
-		}
+		// TODO: This overwrites an existing relay-document id potentially,
+		// depending on how the server responds
+		const doc_id = response.json.result["relay-document"];
+		// update document to contain new document id
+		app.fileManager.processFrontMatter(activeFile, (frontmatter) => {
+			frontmatter["relay-document"] = doc_id;
+		});
 	}
 }
 
