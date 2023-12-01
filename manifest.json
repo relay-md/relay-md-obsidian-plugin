@@ -3,9 +3,10 @@
 	"name": "Relay.md Plugin",
 	"version": "1.0.0",
 	"minAppVersion": "0.15.0",
-	"description": "Relay notes to friends and teams.",
+	"description": "Markdown workflows for teams.",
 	"author": "Fabian Schuh",
 	"authorUrl": "https://chainsquad.com",
 	"fundingUrl": "https://www.buymeacoffee.com/fabian.schuh",
+	"repo": "relay-md/relay-md-obsidian-plugin",
 	"isDesktopOnly": false
 }
