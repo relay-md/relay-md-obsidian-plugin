@@ -1,3 +1,17 @@
+# [1.3.0](https://github.com/relay-md/relay-md-obsidian-plugin/compare/1.2.0...1.3.0) (2023-12-02)
+
+
+### Bug Fixes
+
+* deal with errors on api differently ([30cd942](https://github.com/relay-md/relay-md-obsidian-plugin/commit/30cd942d42d6041b4f76084e8a64324999d152c6))
+
+
+### Features
+
+* allow to obtain access-key via click of a button in settings ([01687b1](https://github.com/relay-md/relay-md-obsidian-plugin/commit/01687b1c6ce09d2d3bfcf0f92e7ed98dd3255f4a))
+* regularily try to fetch documents from api ([169077f](https://github.com/relay-md/relay-md-obsidian-plugin/commit/169077fdb8127c3229674cf4007cec766709cfb2))
+* regularily try to fetch documents from api ([5cc849c](https://github.com/relay-md/relay-md-obsidian-plugin/commit/5cc849c853047e211a2dd873f90511ce48c002a2))
+
 # [1.2.0](https://github.com/relay-md/relay-md-obsidian-plugin/compare/1.1.8...1.2.0) (2023-12-01)
 
 
