@@ -1,3 +1,23 @@
+# [1.2.0](https://github.com/relay-md/relay-md-obsidian-plugin/compare/1.1.8...1.2.0) (2023-12-01)
+
+
+### Bug Fixes
+
+* deal with errors on api differently ([954c4cf](https://github.com/relay-md/relay-md-obsidian-plugin/commit/954c4cf7f113d884f1e36d92b6a5aa0d7441f155))
+
+
+### Features
+
+* regularily try to fetch documents from api ([6e5f8a6](https://github.com/relay-md/relay-md-obsidian-plugin/commit/6e5f8a6e6c75ca06eba814e2be52f0286293ec0b))
+* regularily try to fetch documents from api ([972adc8](https://github.com/relay-md/relay-md-obsidian-plugin/commit/972adc8bc0df38367f06b1cc65a536315666934e))
+
+## [1.1.8](https://github.com/relay-md/relay-md-obsidian-plugin/compare/1.1.7...1.1.8) (2023-12-01)
+
+
+### Bug Fixes
+
+* maybe author needs to be xeroc ([1b40b5b](https://github.com/relay-md/relay-md-obsidian-plugin/commit/1b40b5b5990015d783ed112e7581d9113e7f0f50))
+
 ## [1.1.7](https://github.com/relay-md/relay-md-obsidian-plugin/compare/1.1.6...1.1.7) (2023-12-01)
 
 
