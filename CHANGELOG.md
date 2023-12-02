@@ -1,3 +1,10 @@
+## [1.3.1](https://github.com/relay-md/relay-md-obsidian-plugin/compare/1.3.0...1.3.1) (2023-12-02)
+
+
+### Bug Fixes
+
+* **link:** use prod for auth ([23aaf86](https://github.com/relay-md/relay-md-obsidian-plugin/commit/23aaf8627d93b3a07308a33c8f2c17845caf8184))
+
 # [1.3.0](https://github.com/relay-md/relay-md-obsidian-plugin/compare/1.2.0...1.3.0) (2023-12-02)
 
 

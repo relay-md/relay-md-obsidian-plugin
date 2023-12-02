@@ -220,7 +220,7 @@ var RelayMDSettingTab = class extends import_obsidian.PluginSettingTab {
     if (this.plugin.settings.api_key == DEFAULT_SETTINGS.api_key) {
       new import_obsidian.Setting(containerEl).setName("API Access").setDesc("Authenticate against the relay.md API").addButton(
         (button) => button.setButtonText("Obtain access to relay.md").onClick(async () => {
-          window.open("localhost:5000/configure/obsidian");
+          window.open("https://relay.md/configure/obsidian");
         })
       );
     } else {
