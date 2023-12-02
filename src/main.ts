@@ -47,22 +47,7 @@ export default class RelayMdPLugin extends Plugin {
 			callback: async () => {
 				new Notice("Sending document to relay.md");
 				const activeFile = this.app.workspace.getActiveFile();
-				if (!activeFile) {
-					return;
-				}
-				if (activeFile.extension !== "md") {
-					new Notice(
-						"The current file is not a markdown file. Please open a markdown file and try again.",
-					);
-					return;
-				}
-				if (activeFile.path.startsWith(this.settings.vault_base_folder)) {
-					new Notice(
-						"Files from the relay.md base folder cannot be sent."
-					);
-				} else {
-					await this.send_document(activeFile);
-				}
+				await this.send_document(activeFile);
 			}
 		});
 
@@ -74,6 +59,19 @@ export default class RelayMdPLugin extends Plugin {
 				await this.get_recent_documents();
 			}
 		});
+
+		// We look into all documents that are modified
+		this.app.vault.on('modify', (file: TAbstractFile) => {
+			if(file instanceof TFile) {
+				this.send_document(file);
+			}
+		});
+		this.app.vault.on('create', (file: TAbstractFile) => {
+			if(file instanceof TFile) {
+				this.send_document(file);
+			}
+		});
+
 
 		// Additionally, we register a timer to fetch documents for us
 		this.registerInterval(window.setInterval(() => {
@@ -174,7 +172,6 @@ export default class RelayMdPLugin extends Plugin {
 		try {
 			// TODO: might want to make the interface clear to get rid of "any" type
 			response.json.result.map(async (item: any) => {
-				console.log(item);
 				new Notice("Obtaining " + item["relay-filename"]);
 				await this.load_document(item["relay-document"]);
 			})
@@ -184,50 +181,76 @@ export default class RelayMdPLugin extends Plugin {
 		}
 	}
 
-	// TODO: might want to make the interface clear to get rid of "any" type
-	async send_document(activeFile: any) {
-		const body = await this.app.vault.cachedRead(activeFile);
-		const metadata = this.app.metadataCache.getCache(activeFile.path);
-		if (metadata === null || metadata === undefined) {
+	async send_document(activeFile: Tfile) {
+		try {
+			if (!activeFile) {
+				return;
+			}
+			// File not markdown
+			if (activeFile.extension !== "md") {
+				new Notice(
+					"The current file is not a markdown file. Please open a markdown file and try again.",
+				);
+				return;
+			}
+			// File is in the shared folder, no re-sharing
+			if (activeFile.path.startsWith(this.settings.vault_base_folder)) {
+				new Notice(
+					"Files from the relay.md base folder cannot be sent."
+				);
+				return;
+			}
+			const body = await this.app.vault.cachedRead(activeFile);
+			const metadata = this.app.metadataCache.getCache(activeFile.path);
+
 			// There is no metadata so it cannot possibly be shared with anyone
-			return;
-		}
-		if (metadata.frontmatter === null || metadata.frontmatter === undefined) {
-			// There is no frontmatter so it cannot possibly be shared with anyone
-			return;
-		}
-		const id = metadata.frontmatter["relay-document"]
+			if (!metadata || !metadata.frontmatter) {
+				return;
+			}
 
-		let method = "POST";
-		let url = this.settings.base_uri + '/v1/doc?filename=' + encodeURIComponent(activeFile.name);
-		if (id) {
-			method = "PUT"
-			url = this.settings.base_uri + '/v1/doc/' + id;
-		}
-		const options: RequestUrlParam = {
-			url: url,
-			method: method,
-			headers: {
-				'X-API-KEY': this.settings.api_key,
-				'Content-Type': 'text/markdown'
-			},
-			body: body,
-		}
-		const response: RequestUrlResponse = await requestUrl(options);
-		if (response.json.error) {
-			console.error("API server returned an error");
-			new Notice("Relay.md returned an error: " + response.json.error.message);
-			return;
-		}
+			const relay_to = metadata.frontmatter["relay-to"];
+			// We only share if relay-to is provided!
+			if (!relay_to) {
+				return
+			}
 
-		// new document -> store id in frontmatter
-		// TODO: This overwrites an existing relay-document id potentially,
-		// depending on how the server responds
-		const doc_id = response.json.result["relay-document"];
-		// update document to contain new document id
-		app.fileManager.processFrontMatter(activeFile, (frontmatter) => {
-			frontmatter["relay-document"] = doc_id;
-		});
+			// Do we already have an id maybe?
+			const id = metadata.frontmatter["relay-document"]
+
+			// Either we POST a new document or we PUT an existing document
+			let method = "POST";
+			let url = this.settings.base_uri + '/v1/doc?filename=' + encodeURIComponent(activeFile.name);
+			if (id) {
+				method = "PUT"
+				url = this.settings.base_uri + '/v1/doc/' + id;
+			}
+			console.log("Sending API request to api.relay.md (" + method + ")");
+			const options: RequestUrlParam = {
+				url: url,
+				method: method,
+				headers: {
+					'X-API-KEY': this.settings.api_key,
+					'Content-Type': 'text/markdown'
+				},
+				body: body,
+			}
+			const response: RequestUrlResponse = await requestUrl(options);
+			if (response.json.error) {
+				console.error("API server returned an error");
+				new Notice("Relay.md returned an error: " + response.json.error.message);
+				return;
+			}
+
+			// TODO: This overwrites an existing relay-document id potentially,
+			// depending on how the server responds
+			const doc_id = response.json.result["relay-document"];
+			// update document to contain new document id
+			app.fileManager.processFrontMatter(activeFile, (frontmatter) => {
+				frontmatter["relay-document"] = doc_id;
+			});
+		} catch (e) {
+			console.log(e);
+		}
 	}
 }
 
@@ -262,6 +285,7 @@ class RelayMDSettingTab extends PluginSettingTab {
 				.addButton((button) =>
 					button.setButtonText("Obtain access to relay.md").onClick(async () => {
 						window.open("https://relay.md/configure/obsidian");
+						//window.open("http://localhost:5000/configure/obsidian");
 					})
 				);
 		} else {
