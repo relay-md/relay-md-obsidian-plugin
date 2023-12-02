@@ -261,7 +261,7 @@ class RelayMDSettingTab extends PluginSettingTab {
 				.setDesc('Authenticate against the relay.md API')
 				.addButton((button) =>
 					button.setButtonText("Obtain access to relay.md").onClick(async () => {
-						window.open("localhost:5000/configure/obsidian");
+						window.open("https://relay.md/configure/obsidian");
 					})
 				);
 		} else {
