@@ -28,6 +28,18 @@ export default class RelayMdPLugin extends Plugin {
 
 	async onload() {
 		await this.loadSettings();
+		
+		// To make obtaining the access-token easier,
+		// we register a protocol handler
+		this.registerObsidianProtocolHandler("relay.md:access-token", (params) =>{
+			if (!params.token) {
+				return;
+			}
+			this.settings.api_key = params.token;
+			this.settings.base_uri = DEFAULT_SETTINGS.base_uri; // also potentially reset the base uri
+			this.saveSettings();
+			new Notice("Access credentials for relay.md have been succesfully installed!");
+		});
 
 		this.addCommand({
 			id: "relay-md-send-current-active-file",
@@ -243,16 +255,28 @@ class RelayMDSettingTab extends PluginSettingTab {
 					await this.plugin.saveSettings();
 				}));
 
-		new Setting(containerEl)
-			.setName('Setting #1')
-			.setDesc('It\'s a secret')
-			.addText(text => text
-				.setPlaceholder('Enter your API-Key')
-				.setValue(this.plugin.settings.api_key)
-				.onChange(async (value) => {
-					this.plugin.settings.api_key = value;
-					await this.plugin.saveSettings();
-				}));
+		if (this.plugin.settings.api_key == DEFAULT_SETTINGS.api_key) {
+			new Setting(containerEl)
+				.setName('API Access')
+				.setDesc('Authenticate against the relay.md API')
+				.addButton((button) =>
+					button.setButtonText("Obtain access to relay.md").onClick(async () => {
+						window.open("localhost:5000/configure/obsidian");
+					})
+				);
+		} else {
+			new Setting(containerEl)
+				.setName('API Access')
+				.setDesc('Authenticate against the relay.md API')
+				.addButton((button) =>
+					button.setButtonText("reset").onClick(async () => {
+						this.plugin.settings.api_key = DEFAULT_SETTINGS.api_key;
+						await this.plugin.saveSettings();
+						// refresh settings page
+						this.display();
+					})
+				);
+		}
 
 		new Setting(containerEl)
 			.setName('Vault relay.md inbox')
