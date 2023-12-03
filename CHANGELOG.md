@@ -1,3 +1,15 @@
+# [1.4.0](https://github.com/relay-md/relay-md-obsidian-plugin/compare/1.3.1...1.4.0) (2023-12-03)
+
+
+### Bug Fixes
+
+* very strict typescript :D ([510cd21](https://github.com/relay-md/relay-md-obsidian-plugin/commit/510cd218af8ea3d5856059a0f82ff194be9230f8))
+
+
+### Features
+
+* automatically send files on create/modify (if relay-to present) ([5dd029b](https://github.com/relay-md/relay-md-obsidian-plugin/commit/5dd029bf364f462417a7b6564d0e6e95fa69a5c0))
+
 ## [1.3.1](https://github.com/relay-md/relay-md-obsidian-plugin/compare/1.3.0...1.3.1) (2023-12-02)
 
 

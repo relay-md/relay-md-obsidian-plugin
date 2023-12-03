@@ -51,22 +51,7 @@ var RelayMdPLugin = class extends import_obsidian.Plugin {
       callback: async () => {
         new import_obsidian.Notice("Sending document to relay.md");
         const activeFile = this.app.workspace.getActiveFile();
-        if (!activeFile) {
-          return;
-        }
-        if (activeFile.extension !== "md") {
-          new import_obsidian.Notice(
-            "The current file is not a markdown file. Please open a markdown file and try again."
-          );
-          return;
-        }
-        if (activeFile.path.startsWith(this.settings.vault_base_folder)) {
-          new import_obsidian.Notice(
-            "Files from the relay.md base folder cannot be sent."
-          );
-        } else {
-          await this.send_document(activeFile);
-        }
+        await this.send_document(activeFile);
       }
     });
     this.addCommand({
@@ -75,6 +60,16 @@ var RelayMdPLugin = class extends import_obsidian.Plugin {
       callback: async () => {
         new import_obsidian.Notice("Retreiving documents from relay.md");
         await this.get_recent_documents();
+      }
+    });
+    this.app.vault.on("modify", (file) => {
+      if (file instanceof import_obsidian.TFile) {
+        this.send_document(file);
+      }
+    });
+    this.app.vault.on("create", (file) => {
+      if (file instanceof import_obsidian.TFile) {
+        this.send_document(file);
       }
     });
     this.registerInterval(window.setInterval(() => {
@@ -158,7 +153,6 @@ var RelayMdPLugin = class extends import_obsidian.Plugin {
     }
     try {
       response.json.result.map(async (item) => {
-        console.log(item);
         new import_obsidian.Notice("Obtaining " + item["relay-filename"]);
         await this.load_document(item["relay-document"]);
       });
@@ -167,42 +161,62 @@ var RelayMdPLugin = class extends import_obsidian.Plugin {
       throw e;
     }
   }
-  // TODO: might want to make the interface clear to get rid of "any" type
   async send_document(activeFile) {
-    const body = await this.app.vault.cachedRead(activeFile);
-    const metadata = this.app.metadataCache.getCache(activeFile.path);
-    if (metadata === null || metadata === void 0) {
-      return;
+    try {
+      if (!activeFile) {
+        return;
+      }
+      if (activeFile.extension !== "md") {
+        new import_obsidian.Notice(
+          "The current file is not a markdown file. Please open a markdown file and try again."
+        );
+        return;
+      }
+      if (activeFile.path.startsWith(this.settings.vault_base_folder)) {
+        new import_obsidian.Notice(
+          "Files from the relay.md base folder cannot be sent."
+        );
+        return;
+      }
+      const body = await this.app.vault.cachedRead(activeFile);
+      const metadata = this.app.metadataCache.getCache(activeFile.path);
+      if (!metadata || !metadata.frontmatter) {
+        return;
+      }
+      const relay_to = metadata.frontmatter["relay-to"];
+      if (!relay_to) {
+        return;
+      }
+      const id = metadata.frontmatter["relay-document"];
+      let method = "POST";
+      let url = this.settings.base_uri + "/v1/doc?filename=" + encodeURIComponent(activeFile.name);
+      if (id) {
+        method = "PUT";
+        url = this.settings.base_uri + "/v1/doc/" + id;
+      }
+      console.log("Sending API request to api.relay.md (" + method + ")");
+      const options = {
+        url,
+        method,
+        headers: {
+          "X-API-KEY": this.settings.api_key,
+          "Content-Type": "text/markdown"
+        },
+        body
+      };
+      const response = await (0, import_obsidian.requestUrl)(options);
+      if (response.json.error) {
+        console.error("API server returned an error");
+        new import_obsidian.Notice("Relay.md returned an error: " + response.json.error.message);
+        return;
+      }
+      const doc_id = response.json.result["relay-document"];
+      app.fileManager.processFrontMatter(activeFile, (frontmatter) => {
+        frontmatter["relay-document"] = doc_id;
+      });
+    } catch (e) {
+      console.log(e);
     }
-    if (metadata.frontmatter === null || metadata.frontmatter === void 0) {
-      return;
-    }
-    const id = metadata.frontmatter["relay-document"];
-    let method = "POST";
-    let url = this.settings.base_uri + "/v1/doc?filename=" + encodeURIComponent(activeFile.name);
-    if (id) {
-      method = "PUT";
-      url = this.settings.base_uri + "/v1/doc/" + id;
-    }
-    const options = {
-      url,
-      method,
-      headers: {
-        "X-API-KEY": this.settings.api_key,
-        "Content-Type": "text/markdown"
-      },
-      body
-    };
-    const response = await (0, import_obsidian.requestUrl)(options);
-    if (response.json.error) {
-      console.error("API server returned an error");
-      new import_obsidian.Notice("Relay.md returned an error: " + response.json.error.message);
-      return;
-    }
-    const doc_id = response.json.result["relay-document"];
-    app.fileManager.processFrontMatter(activeFile, (frontmatter) => {
-      frontmatter["relay-document"] = doc_id;
-    });
   }
 };
 var RelayMDSettingTab = class extends import_obsidian.PluginSettingTab {
