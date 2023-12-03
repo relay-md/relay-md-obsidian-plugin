@@ -8,6 +8,7 @@ import {
 	RequestUrlResponse,
 	requestUrl,
 	TFile,
+	TAbstractFile,
 	normalizePath
 } from 'obsidian';
 
@@ -181,7 +182,7 @@ export default class RelayMdPLugin extends Plugin {
 		}
 	}
 
-	async send_document(activeFile: Tfile) {
+	async send_document(activeFile: TFile | null) {
 		try {
 			if (!activeFile) {
 				return;
