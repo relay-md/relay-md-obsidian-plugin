@@ -46,8 +46,8 @@ var RelayMdPLugin = class extends import_obsidian.Plugin {
       new import_obsidian.Notice("Access credentials for relay.md have been succesfully installed!");
     });
     this.addCommand({
-      id: "relay-md-send-current-active-file",
-      name: "Relay.md: Send current open file",
+      id: "send-current-active-file",
+      name: "Send current open file",
       callback: async () => {
         new import_obsidian.Notice("Sending document to relay.md");
         const activeFile = this.app.workspace.getActiveFile();
@@ -55,23 +55,23 @@ var RelayMdPLugin = class extends import_obsidian.Plugin {
       }
     });
     this.addCommand({
-      id: "relay-md-fetch-documents",
-      name: "Relay.md: Retreive recent files",
+      id: "fetch-documents",
+      name: "Retreive recent files",
       callback: async () => {
         new import_obsidian.Notice("Retreiving documents from relay.md");
         await this.get_recent_documents();
       }
     });
-    this.app.vault.on("modify", (file) => {
+    this.registerEvent(this.app.vault.on("modify", (file) => {
       if (file instanceof import_obsidian.TFile) {
         this.send_document(file);
       }
-    });
-    this.app.vault.on("create", (file) => {
+    }));
+    this.registerEvent(this.app.vault.on("create", (file) => {
       if (file instanceof import_obsidian.TFile) {
         this.send_document(file);
       }
-    });
+    }));
     this.registerInterval(window.setInterval(() => {
       this.get_recent_documents();
     }, 5 * 60 * 1e3));
@@ -86,17 +86,19 @@ var RelayMdPLugin = class extends import_obsidian.Plugin {
     await this.saveData(this.settings);
   }
   async upsert_document(folder, filename, body) {
-    folder.split("/").reduce(
-      (directories, directory) => {
-        directories += `${directory}/`;
-        try {
-          this.app.vault.createFolder(directories);
-        } catch (e) {
-        }
-        return directories;
-      },
-      ""
-    );
+    if (!(this.app.vault.getAbstractFileByPath(folder) instanceof import_obsidian.TFolder)) {
+      folder.split("/").reduce(
+        (directories, directory) => {
+          directories += `${directory}/`;
+          try {
+            this.app.vault.createFolder(directories);
+          } catch (e) {
+          }
+          return directories;
+        },
+        ""
+      );
+    }
     const full_path_to_file = (0, import_obsidian.normalizePath)(folder + "/" + filename);
     const fileRef = this.app.vault.getAbstractFileByPath(full_path_to_file);
     if (fileRef === void 0 || fileRef === null) {
