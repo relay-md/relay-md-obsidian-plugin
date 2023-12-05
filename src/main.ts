@@ -9,6 +9,7 @@ import {
 	requestUrl,
 	TFile,
 	TAbstractFile,
+	TFolder,
 	normalizePath
 } from 'obsidian';
 
@@ -43,8 +44,8 @@ export default class RelayMdPLugin extends Plugin {
 		});
 
 		this.addCommand({
-			id: "relay-md-send-current-active-file",
-			name: "Relay.md: Send current open file",
+			id: "send-current-active-file",
+			name: "Send current open file",
 			callback: async () => {
 				new Notice("Sending document to relay.md");
 				const activeFile = this.app.workspace.getActiveFile();
@@ -53,8 +54,8 @@ export default class RelayMdPLugin extends Plugin {
 		});
 
 		this.addCommand({
-			id: "relay-md-fetch-documents",
-			name: "Relay.md: Retreive recent files",
+			id: "fetch-documents",
+			name: "Retreive recent files",
 			callback: async () => {
 				new Notice("Retreiving documents from relay.md");
 				await this.get_recent_documents();
@@ -62,16 +63,16 @@ export default class RelayMdPLugin extends Plugin {
 		});
 
 		// We look into all documents that are modified
-		this.app.vault.on('modify', (file: TAbstractFile) => {
+		this.registerEvent(this.app.vault.on('modify', (file: TAbstractFile) => {
 			if(file instanceof TFile) {
 				this.send_document(file);
 			}
-		});
-		this.app.vault.on('create', (file: TAbstractFile) => {
+		}));
+		this.registerEvent(this.app.vault.on('create', (file: TAbstractFile) => {
 			if(file instanceof TFile) {
 				this.send_document(file);
 			}
-		});
+		}));
 
 
 		// Additionally, we register a timer to fetch documents for us
@@ -95,19 +96,21 @@ export default class RelayMdPLugin extends Plugin {
 	}
 
 	async upsert_document(folder: string, filename: string, body: string) {
-		// FIXME: There is no way to check if a folder exists, so we just try create them
-		folder.split('/').reduce(
-			(directories, directory) => {
-				directories += `${directory}/`;
-				try {
-					this.app.vault.createFolder(directories);
-				} catch(e) {
-					// do nothing
-				}
-				return directories;
-			},
-			'',
-		);
+		// Does the folder exist? If not, create it "recusrively"
+		if (!(this.app.vault.getAbstractFileByPath(folder) instanceof TFolder)) {
+			folder.split('/').reduce(
+				(directories, directory) => {
+					directories += `${directory}/`;
+					try {
+						this.app.vault.createFolder(directories);
+					} catch(e) {
+						// do nothing
+					}
+					return directories;
+				},
+				'',
+			);
+		}
 		const full_path_to_file = normalizePath(folder + "/" + filename);
 		const fileRef = this.app.vault.getAbstractFileByPath(full_path_to_file);
 		if(fileRef === undefined || fileRef === null) {
