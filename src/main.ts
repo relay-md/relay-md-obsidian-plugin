@@ -192,9 +192,11 @@ export default class RelayMdPLugin extends Plugin {
 			}
 			// File not markdown
 			if (activeFile.extension !== "md") {
-				new Notice(
-					"The current file is not a markdown file. Please open a markdown file and try again.",
-				);
+				//NOTE: This gets called on all files on the vault potentially (e.g. syncing)
+				//So, we don't call the Notice here, might want to do if the method is called manually though.
+				//new Notice(
+				//	"The current file is not a markdown file. Please open a markdown file and try again.",
+				//);
 				return;
 			}
 			// File is in the shared folder, no re-sharing
