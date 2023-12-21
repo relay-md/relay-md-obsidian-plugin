@@ -1,3 +1,11 @@
+## [1.4.3](https://github.com/relay-md/relay-md-obsidian-plugin/compare/1.4.2...1.4.3) (2023-12-21)
+
+
+### Bug Fixes
+
+* more explanation in README.md ([c36b64d](https://github.com/relay-md/relay-md-obsidian-plugin/commit/c36b64db6afeb0329a16537367bf589c9f86c414))
+* requested changes from obsidian devs ([73e7593](https://github.com/relay-md/relay-md-obsidian-plugin/commit/73e759323d3cccc5a62af0bb02b1c5f999723d77))
+
 ## [1.4.2](https://github.com/relay-md/relay-md-obsidian-plugin/compare/1.4.1...1.4.2) (2023-12-05)
 
 

@@ -1,7 +1,7 @@
 {
   "id": "relay-md",
   "name": "Relay.md",
-  "version": "1.4.2",
+  "version": "1.4.3",
   "minAppVersion": "0.15.0",
   "description": "Markdown workflows for teams.",
   "author": "xeroc",
