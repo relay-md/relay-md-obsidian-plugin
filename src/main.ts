@@ -21,7 +21,7 @@ interface RelayMDSettings {
 
 const DEFAULT_SETTINGS: RelayMDSettings = {
 	base_uri: 'https://api.relay.md',
-	api_key: '00000000-0000-0000-0000-000000000000',
+	api_key: '',
 	vault_base_folder: "relay.md"
 }
 
@@ -63,7 +63,10 @@ export default class RelayMdPLugin extends Plugin {
 		});
 
 		// We look into all documents that are modified
-		this.registerEvent(this.app.vault.on('modify', (file: TAbstractFile) => {
+		// NOTE: We use metadataCache here because the metadata is updated
+		// async and independent of the vault's `modify`. But we want to be
+		// sure we have the correct properties/frontmatter uploaded.
+		this.registerEvent(this.app.metadataCache.on('changed', (file: TAbstractFile) => {
 			if(file instanceof TFile) {
 				this.send_document(file);
 			}
@@ -73,7 +76,6 @@ export default class RelayMdPLugin extends Plugin {
 				this.send_document(file);
 			}
 		}));
-
 
 		// Additionally, we register a timer to fetch documents for us
 		this.registerInterval(window.setInterval(() => {
@@ -186,67 +188,74 @@ export default class RelayMdPLugin extends Plugin {
 	}
 
 	async send_document(activeFile: TFile | null) {
+		if (!activeFile) {
+			return;
+		}
+		// File not markdown
+		if (activeFile.extension !== "md") {
+			//NOTE: This gets called on all files on the vault potentially (e.g. syncing)
+			//So, we don't call the Notice here, might want to do if the method is called manually though.
+			//new Notice(
+			//	"The current file is not a markdown file. Please open a markdown file and try again.",
+			//);
+			return;
+		}
+		// File is in the shared folder, no re-sharing
+		if (activeFile.path.startsWith(this.settings.vault_base_folder + "/")) {
+			new Notice(
+				"Files from the relay.md base folder cannot be sent."
+			);
+			return;
+		}
+		const metadata = this.app.metadataCache.getCache(activeFile.path);
+
+		// There is no metadata so it cannot possibly be shared with anyone
+		if (!metadata || !metadata.frontmatter) {
+			return;
+		}
+
+		const relay_to = metadata.frontmatter["relay-to"];
+		// We only share if relay-to is provided!
+		if (!relay_to) {
+			return
+		}
+
+		// Do we already have an id maybe?
+		const id = metadata.frontmatter["relay-document"]
+
+		// Get the content of the file
+		const body = await this.app.vault.cachedRead(activeFile);
+
+		// Either we POST a new document or we PUT an existing document
+		let method = "POST";
+		let url = this.settings.base_uri + '/v1/doc?filename=' + encodeURIComponent(activeFile.name);
+		if (id) {
+			method = "PUT"
+			url = this.settings.base_uri + '/v1/doc/' + id;
+		}
+		console.log("Sending API request to api.relay.md (" + method + ")");
+		const options: RequestUrlParam = {
+			url: url,
+			method: method,
+			headers: {
+				'X-API-KEY': this.settings.api_key,
+				'Content-Type': 'text/markdown'
+			},
+			body: body,
+		}
+		const response: RequestUrlResponse = await requestUrl(options);
+		if (response.json.error) {
+			console.error("API server returned an error");
+			new Notice("Relay.md returned an error: " + response.json.error.message);
+			return;
+		}
+
 		try {
-			if (!activeFile) {
-				return;
-			}
-			// File not markdown
-			if (activeFile.extension !== "md") {
-				new Notice(
-					"The current file is not a markdown file. Please open a markdown file and try again.",
-				);
-				return;
-			}
-			// File is in the shared folder, no re-sharing
-			if (activeFile.path.startsWith(this.settings.vault_base_folder)) {
-				new Notice(
-					"Files from the relay.md base folder cannot be sent."
-				);
-				return;
-			}
-			const body = await this.app.vault.cachedRead(activeFile);
-			const metadata = this.app.metadataCache.getCache(activeFile.path);
-
-			// There is no metadata so it cannot possibly be shared with anyone
-			if (!metadata || !metadata.frontmatter) {
-				return;
-			}
-
-			const relay_to = metadata.frontmatter["relay-to"];
-			// We only share if relay-to is provided!
-			if (!relay_to) {
-				return
-			}
-
-			// Do we already have an id maybe?
-			const id = metadata.frontmatter["relay-document"]
-
-			// Either we POST a new document or we PUT an existing document
-			let method = "POST";
-			let url = this.settings.base_uri + '/v1/doc?filename=' + encodeURIComponent(activeFile.name);
-			if (id) {
-				method = "PUT"
-				url = this.settings.base_uri + '/v1/doc/' + id;
-			}
-			console.log("Sending API request to api.relay.md (" + method + ")");
-			const options: RequestUrlParam = {
-				url: url,
-				method: method,
-				headers: {
-					'X-API-KEY': this.settings.api_key,
-					'Content-Type': 'text/markdown'
-				},
-				body: body,
-			}
-			const response: RequestUrlResponse = await requestUrl(options);
-			if (response.json.error) {
-				console.error("API server returned an error");
-				new Notice("Relay.md returned an error: " + response.json.error.message);
-				return;
-			}
-
-			// TODO: This overwrites an existing relay-document id potentially,
-			// depending on how the server responds
+			// WARNING: This overwrites an existing relay-document id potentially,
+			// depending on how the server responds. It's a feature, and not a bug and
+			// allows the backend to decide if a new document should be
+			// created, or the old one should be updated, depending on
+			// permissions.
 			const doc_id = response.json.result["relay-document"];
 			// update document to contain new document id
 			app.fileManager.processFrontMatter(activeFile, (frontmatter) => {
@@ -282,7 +291,7 @@ class RelayMDSettingTab extends PluginSettingTab {
 					await this.plugin.saveSettings();
 				}));
 
-		if (this.plugin.settings.api_key == DEFAULT_SETTINGS.api_key) {
+		if (this.plugin.settings.api_key === DEFAULT_SETTINGS.api_key) {
 			new Setting(containerEl)
 				.setName('API Access')
 				.setDesc('Authenticate against the relay.md API')
