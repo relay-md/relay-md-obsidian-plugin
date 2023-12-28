@@ -202,7 +202,7 @@ export default class RelayMdPLugin extends Plugin {
         }
         // File is in the shared folder, no re-sharing
         if (activeFile.path.startsWith(this.settings.vault_base_folder + "/")) {
-            new Notice(
+            console.warn(
                 "Files from the relay.md base folder cannot be sent."
             );
             return;
