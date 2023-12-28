@@ -200,13 +200,6 @@ export default class RelayMdPLugin extends Plugin {
             //);
             return;
         }
-        // File is in the shared folder, no re-sharing
-        if (activeFile.path.startsWith(this.settings.vault_base_folder + "/")) {
-            console.warn(
-                "Files from the relay.md base folder cannot be sent."
-            );
-            return;
-        }
         const metadata = this.app.metadataCache.getCache(activeFile.path);
 
         // There is no metadata so it cannot possibly be shared with anyone
@@ -214,10 +207,17 @@ export default class RelayMdPLugin extends Plugin {
             return;
         }
 
-        const relay_to = metadata.frontmatter["relay-to"];
-        // We only share if relay-to is provided!
-        if (!relay_to) {
+        // We only share if relay-to is provided, even if its empty
+        if (!("relay-to" in metadata.frontmatter)) {
             return
+        }
+
+        // File is in the shared folder, no re-sharing
+        if (activeFile.path.startsWith(this.settings.vault_base_folder + "/")) {
+            console.warn(
+                "Files from the relay.md base folder cannot be sent."
+            );
+            return;
         }
 
         // Do we already have an id maybe?
