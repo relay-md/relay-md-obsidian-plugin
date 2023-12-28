@@ -170,18 +170,17 @@ var RelayMdPLugin = class extends import_obsidian.Plugin {
     if (activeFile.extension !== "md") {
       return;
     }
-    if (activeFile.path.startsWith(this.settings.vault_base_folder + "/")) {
-      new import_obsidian.Notice(
-        "Files from the relay.md base folder cannot be sent."
-      );
-      return;
-    }
     const metadata = this.app.metadataCache.getCache(activeFile.path);
     if (!metadata || !metadata.frontmatter) {
       return;
     }
-    const relay_to = metadata.frontmatter["relay-to"];
-    if (!relay_to) {
+    if (!("relay-to" in metadata.frontmatter)) {
+      return;
+    }
+    if (activeFile.path.startsWith(this.settings.vault_base_folder + "/")) {
+      console.warn(
+        "Files from the relay.md base folder cannot be sent."
+      );
       return;
     }
     const id = metadata.frontmatter["relay-document"];
