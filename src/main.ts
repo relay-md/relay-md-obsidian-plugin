@@ -103,10 +103,8 @@ export default class RelayMdPLugin extends Plugin {
             folder.split('/').reduce(
                 (directories, directory) => {
                     directories += `${directory}/`;
-                    try {
+                    if (!(this.app.vault.getAbstractFileByPath(folder) instanceof TFolder)) {
                         this.app.vault.createFolder(directories);
-                    } catch (e) {
-                        // do nothing
                     }
                     return directories;
                 },
@@ -152,7 +150,7 @@ export default class RelayMdPLugin extends Plugin {
                 if (team != "_")
                     full_path_to_file += team + "/";
                 full_path_to_file += topic;
-                this.upsert_document(full_path_to_file, filename, body);
+                this.upsert_document(normalizePath(full_path_to_file), filename, body);
             }
         } catch (e) {
             console.log(JSON.stringify(e));
@@ -221,7 +219,7 @@ export default class RelayMdPLugin extends Plugin {
         }
 
         // Do we already have an id maybe?
-        const id = metadata.frontmatter["relay-document"]
+        let id = metadata.frontmatter["relay-document"]
 
         // Get the content of the file
         const body = await this.app.vault.cachedRead(activeFile);
@@ -233,7 +231,7 @@ export default class RelayMdPLugin extends Plugin {
             method = "PUT"
             url = this.settings.base_uri + '/v1/doc/' + id;
         }
-        console.log("Sending API request to api.relay.md (" + method + ")");
+        console.log("Sending API request to " + this.settings.base_uri + " (" + method + ")");
         const options: RequestUrlParam = {
             url: url,
             method: method,
@@ -256,15 +254,49 @@ export default class RelayMdPLugin extends Plugin {
             // allows the backend to decide if a new document should be
             // created, or the old one should be updated, depending on
             // permissions.
-            const doc_id = response.json.result["relay-document"];
+            id = response.json.result["relay-document"];
             // update document to contain new document id
-            app.fileManager.processFrontMatter(activeFile, (frontmatter) => {
-                frontmatter["relay-document"] = doc_id;
+            this.app.fileManager.processFrontMatter(activeFile, (frontmatter) => {
+                frontmatter["relay-document"] = id;
             });
         } catch (e) {
             console.log(e);
         }
+
+        // Now try upload the embeds
+        if (!metadata.embeds) {
+            return;
+        }
+        metadata.embeds.map(async (item: any) => {
+            let file = this.app.vault.getAbstractFileByPath(item.link);
+            console.log("Uploading attachment: " + item.link);
+            if (file instanceof TFile) {
+                this.upload_asset(id, item.link, file);
+            }
+        });
     }
+
+    async upload_asset(id: string, link: string, file: TFile) {
+        this.app.vault.read(file).then(async (content) => {
+            const options: RequestUrlParam = {
+                url: this.settings.base_uri + '/v1/assets/' + id,
+                method: "POST",
+                headers: {
+                    'X-API-KEY': this.settings.api_key,
+                    'Content-Type': 'application/octet-stream',
+                    'x-relay-filename': link
+                },
+                body: content,
+            }
+            const response: RequestUrlResponse = await requestUrl(options);
+            if (response.json.error) {
+                console.error("API server returned an error");
+                new Notice("Relay.md returned an error: " + response.json.error.message);
+                return;
+            }
+        });
+    }
+
 }
 
 class RelayMDSettingTab extends PluginSettingTab {
