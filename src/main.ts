@@ -277,7 +277,7 @@ export default class RelayMdPLugin extends Plugin {
     }
 
     async upload_asset(id: string, link: string, file: TFile) {
-        this.app.vault.read(file).then(async (content) => {
+        this.app.vault.readBinary(file).then(async (content) => {
             const options: RequestUrlParam = {
                 url: this.settings.base_uri + '/v1/assets/' + id,
                 method: "POST",
