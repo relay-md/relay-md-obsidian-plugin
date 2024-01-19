@@ -13,6 +13,13 @@ import {
     normalizePath
 } from 'obsidian';
 
+interface Embed {
+    checksum_sha256: string;
+    filename: string;
+    filesize: number;
+    id: string;
+}
+
 interface RelayMDSettings {
     base_uri: string;
     api_key: string;
@@ -97,19 +104,23 @@ export default class RelayMdPLugin extends Plugin {
         await this.saveData(this.settings);
     }
 
+    make_directory_recursively(folder: string) {
+        folder.split('/').reduce(
+            (directories, directory) => {
+                directories += `${directory}/`;
+                if (!(this.app.vault.getAbstractFileByPath(folder) instanceof TFolder)) {
+                    this.app.vault.createFolder(directories);
+                }
+                return directories;
+            },
+            '',
+        );
+    }
+
     async upsert_document(folder: string, filename: string, body: string) {
-        // Does the folder exist? If not, create it "recusrively"
+        // Does the folder exist? If not, create it "recursively"
         if (!(this.app.vault.getAbstractFileByPath(folder) instanceof TFolder)) {
-            folder.split('/').reduce(
-                (directories, directory) => {
-                    directories += `${directory}/`;
-                    if (!(this.app.vault.getAbstractFileByPath(folder) instanceof TFolder)) {
-                        this.app.vault.createFolder(directories);
-                    }
-                    return directories;
-                },
-                '',
-            );
+            this.make_directory_recursively(folder);
         }
         const full_path_to_file = normalizePath(folder + "/" + filename);
         const fileRef = this.app.vault.getAbstractFileByPath(full_path_to_file);
@@ -124,6 +135,36 @@ export default class RelayMdPLugin extends Plugin {
     }
 
     async load_document(id: string) {
+        // We first obtain the metdata of the document using application/json
+        const options: RequestUrlParam = {
+            url: this.settings.base_uri + '/v1/doc/' + id,
+            method: 'GET',
+            headers: {
+                'X-API-KEY': this.settings.api_key,
+                'Content-Type': 'application/json'
+            },
+        }
+        const response: RequestUrlResponse = await requestUrl(options);
+        if (response.json.error) {
+            console.error("API server returned an error");
+            new Notice("Relay.md returned an error: " + response.json.error.message);
+            return;
+        }
+
+        const result = response.json.result;
+        const embeds = result.embeds;
+        if (embeds) {
+            embeds.map((embed: Embed) => {
+                this.load_embeds(embed);
+            });
+        }
+
+        // Load the document body, we are going to use text/markdown here
+        //this.load_document_body(id);
+
+        //
+    }
+    async load_document_body(id: string) {
         const options: RequestUrlParam = {
             url: this.settings.base_uri + '/v1/doc/' + id,
             method: 'GET',
@@ -148,13 +189,67 @@ export default class RelayMdPLugin extends Plugin {
                 let full_path_to_file: string = this.settings.vault_base_folder + "/";
                 // We ignore the "_" team which is a "global" team
                 if (team != "_")
-                    full_path_to_file += team + "/";
+                    full_path_to_file += team;
                 full_path_to_file += topic;
                 this.upsert_document(normalizePath(full_path_to_file), filename, body);
             }
+
         } catch (e) {
             console.log(JSON.stringify(e));
             throw e;
+        }
+    }
+
+    async load_embeds(embed: Embed) {
+        // TODO: think about this for a bit, it allows to update other peoples file by just using the same filename
+        // On the other hand, if we were to put the team name into the path, we end up (potentially) having tos
+        // duplicate the file into multiple team's attachment folder. Hmm
+        const folder = this.settings.vault_base_folder + "/" + "_attachments"
+        if (!(this.app.vault.getAbstractFileByPath(folder) instanceof TFolder)) {
+            this.make_directory_recursively(folder);
+        }
+        const path = normalizePath(folder + "/" + embed.filename);
+        const file = this.app.vault.getAbstractFileByPath(path);
+        if (!(file instanceof TFile)) {
+            const content = await this.get_embed_binady(embed);
+            this.app.vault.createBinary(path, content);
+            console.log("Binary file " + path + " has been created!");
+        } else {
+            console.log("file exists, checking hash");
+            const local_content = await this.app.vault.readBinary(file);
+            const checksum = await this.calculateSHA256Checksum(local_content);
+            console.log(checksum, embed.checksum_sha256);
+            if (checksum != embed.checksum_sha256) {
+                const content = await this.get_embed_binady(embed);
+                this.app.vault.modifyBinary(file, content);
+                console.log("Binary file " + path + " has been updated!");
+            }
+        }
+    }
+
+    async get_embed_binady(embed: Embed) {
+        const options: RequestUrlParam = {
+            url: this.settings.base_uri + '/v1/assets/' + embed.id,
+            method: 'GET',
+            headers: {
+                'X-API-KEY': this.settings.api_key,
+                'Content-Type': 'application/octet-stream'
+            },
+        }
+        const response: RequestUrlResponse = await requestUrl(options);
+        return response.arrayBuffer;
+    }
+
+    async calculateSHA256Checksum(buffer: ArrayBuffer): Promise<string> {
+        const data = new Uint8Array(buffer);
+
+        try {
+            const hashBuffer = await window.crypto.subtle.digest('SHA-256', data);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            const checksum = hashArray.map(byte => byte.toString(16).padStart(2, '0')).join('');
+            return checksum;
+        } catch (error) {
+            throw new Error(`Error calculating SHA-256 checksum: ${error}`);
         }
     }
 
@@ -248,6 +343,7 @@ export default class RelayMdPLugin extends Plugin {
             return;
         }
 
+        console.log("Successfully sent to " + this.settings.base_uri);
         try {
             // WARNING: This overwrites an existing relay-document id potentially,
             // depending on how the server responds. It's a feature, and not a bug and
@@ -277,24 +373,24 @@ export default class RelayMdPLugin extends Plugin {
     }
 
     async upload_asset(id: string, link: string, file: TFile) {
-        this.app.vault.readBinary(file).then(async (content) => {
-            const options: RequestUrlParam = {
-                url: this.settings.base_uri + '/v1/assets/' + id,
-                method: "POST",
-                headers: {
-                    'X-API-KEY': this.settings.api_key,
-                    'Content-Type': 'application/octet-stream',
-                    'x-relay-filename': link
-                },
-                body: content,
-            }
-            const response: RequestUrlResponse = await requestUrl(options);
-            if (response.json.error) {
-                console.error("API server returned an error");
-                new Notice("Relay.md returned an error: " + response.json.error.message);
-                return;
-            }
-        });
+        const content = await this.app.vault.readBinary(file);
+        const options: RequestUrlParam = {
+            url: this.settings.base_uri + '/v1/assets/' + id,
+            method: "POST",
+            headers: {
+                'X-API-KEY': this.settings.api_key,
+                'Content-Type': 'application/octet-stream',
+                'x-relay-filename': link
+            },
+            body: content,
+        }
+        const response: RequestUrlResponse = await requestUrl(options);
+        if (response.json.error) {
+            console.error("API server returned an error");
+            new Notice("Relay.md returned an error: " + response.json.error.message);
+            return;
+        }
+        console.log("Successfully uploaded " + file.path);
     }
 
 }
