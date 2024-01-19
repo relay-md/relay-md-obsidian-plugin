@@ -325,6 +325,10 @@ export default class RelayMdPLugin extends Plugin {
         if (id) {
             method = "PUT"
             url = this.settings.base_uri + '/v1/doc/' + id;
+
+            // In this case, we also need to check if we maybe have to update the assets we originally had in the document as well
+            // TODO: this also means that we may have to delete embeds that have been removed from the note since it has been last
+            // sent to the API
         }
         console.log("Sending API request to " + this.settings.base_uri + " (" + method + ")");
         const options: RequestUrlParam = {
