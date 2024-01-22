@@ -13,6 +13,7 @@ import {
     normalizePath
 } from 'obsidian';
 
+
 interface Embed {
     checksum_sha256: string;
     filename: string;
@@ -117,20 +118,14 @@ export default class RelayMdPLugin extends Plugin {
         );
     }
 
-    async upsert_document(folder: string, filename: string, body: string) {
-        // Does the folder exist? If not, create it "recursively"
-        if (!(this.app.vault.getAbstractFileByPath(folder) instanceof TFolder)) {
-            this.make_directory_recursively(folder);
-        }
-        const full_path_to_file = normalizePath(folder + "/" + filename);
-        const fileRef = this.app.vault.getAbstractFileByPath(full_path_to_file);
+    async upsert_document(path: string, body: string) {
+        const fileRef = this.app.vault.getAbstractFileByPath(path);
         if (fileRef === undefined || fileRef === null) {
-            await this.app.vault.create(full_path_to_file, body);
-            new Notice('File ' + full_path_to_file + ' has been created!');
+            await this.app.vault.create(path, body);
+            new Notice('File ' + path + ' has been created!');
         } else if (fileRef instanceof TFile) {
-            // TODO: consider storing multiple versions of a file here!
             await this.app.vault.modify(fileRef, body);
-            new Notice('File ' + full_path_to_file + ' has been modified!');
+            new Notice('File ' + path + ' has been modified!');
         }
     }
 
@@ -160,11 +155,14 @@ export default class RelayMdPLugin extends Plugin {
         }
 
         // Load the document body, we are going to use text/markdown here
-        //this.load_document_body(id);
-
-        //
+        this.load_document_body(result);
     }
-    async load_document_body(id: string) {
+
+    async load_document_body(result: any) {
+        const id: string = result["relay-document"];
+        const filename: string = result["relay-filename"];
+        const relay_to: Array<string> = result["relay-to"]
+
         const options: RequestUrlParam = {
             url: this.settings.base_uri + '/v1/doc/' + id,
             method: 'GET',
@@ -176,27 +174,31 @@ export default class RelayMdPLugin extends Plugin {
         const response: RequestUrlResponse = await requestUrl(options);
         // we do not look for error in json response as we do not get a json
         // response but markdown in the body
-        try {
-            const filename: string = response.headers["x-relay-filename"];
-            const relay_to = JSON.parse(response.headers["x-relay-to"]);
-            const body: string = response.text;
+        const body: string = response.text;
 
+        // Let's first see if we maybe have the document already somewhere in the fault
+        const located_documents = await this.locate_document(id);
+        if (located_documents) {
+            located_documents.forEach((located_document: TFile) => {
+                this.upsert_document(located_document.path, body);
+            })
+        } else {
             // Loop through team/topics
             for (const to of relay_to) {
                 const tos: Array<string> = to.split("@", 2);
                 const team: string = tos[1];
                 const topic: string = tos[0];
-                let full_path_to_file: string = this.settings.vault_base_folder + "/";
+                let folder: string = this.settings.vault_base_folder + "/";
                 // We ignore the "_" team which is a "global" team
                 if (team != "_")
-                    full_path_to_file += team;
-                full_path_to_file += topic;
-                this.upsert_document(normalizePath(full_path_to_file), filename, body);
+                    folder += team;
+                folder += topic;
+                // Does the folder exist? If not, create it "recursively"
+                if (!(this.app.vault.getAbstractFileByPath(folder) instanceof TFolder)) {
+                    this.make_directory_recursively(folder);
+                }
+                this.upsert_document(normalizePath(folder + "/" + filename), body);
             }
-
-        } catch (e) {
-            console.log(JSON.stringify(e));
-            throw e;
         }
     }
 
@@ -215,10 +217,8 @@ export default class RelayMdPLugin extends Plugin {
             this.app.vault.createBinary(path, content);
             console.log("Binary file " + path + " has been created!");
         } else {
-            console.log("file exists, checking hash");
             const local_content = await this.app.vault.readBinary(file);
             const checksum = await this.calculateSHA256Checksum(local_content);
-            console.log(checksum, embed.checksum_sha256);
             if (checksum != embed.checksum_sha256) {
                 const content = await this.get_embed_binady(embed);
                 this.app.vault.modifyBinary(file, content);
@@ -301,16 +301,9 @@ export default class RelayMdPLugin extends Plugin {
         }
 
         // We only share if relay-to is provided, even if its empty
-        if (!("relay-to" in metadata.frontmatter)) {
+        if (!("relay-to" in metadata.frontmatter)
+            || !(metadata.frontmatter["relay-to"])) {
             return
-        }
-
-        // File is in the shared folder, no re-sharing
-        if (activeFile.path.startsWith(this.settings.vault_base_folder + "/")) {
-            console.warn(
-                "Files from the relay.md base folder cannot be sent."
-            );
-            return;
         }
 
         // Do we already have an id maybe?
@@ -397,6 +390,21 @@ export default class RelayMdPLugin extends Plugin {
         console.log("Successfully uploaded " + file.path);
     }
 
+    async locate_document(document_id: string) {
+        const files = this.app.vault.getMarkdownFiles();
+        let located_files: Array<TFile> = [];
+        for (let i = 0; i < files.length; i++) {
+            const activeFile = files[i];
+            const metadata = this.app.metadataCache.getCache(activeFile.path);
+            if (!metadata || !metadata.frontmatter) {
+                return;
+            }
+            if (metadata.frontmatter["relay-document"] == document_id)
+                located_files.push(activeFile);
+        }
+        return located_files;
+    }
+
 }
 
 class RelayMDSettingTab extends PluginSettingTab {
@@ -423,7 +431,7 @@ class RelayMDSettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                 }));
 
-        if (this.plugin.settings.api_key === DEFAULT_SETTINGS.api_key) {
+        if (!(this.plugin.settings.api_key) || this.plugin.settings.api_key === DEFAULT_SETTINGS.api_key) {
             new Setting(containerEl)
                 .setName('API Access')
                 .setDesc('Authenticate against the relay.md API')
