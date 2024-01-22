@@ -25,16 +25,19 @@ interface RelayMDSettings {
     base_uri: string;
     api_key: string;
     vault_base_folder: string
+    fetch_recent_documents_interval: number
 }
 
 const DEFAULT_SETTINGS: RelayMDSettings = {
     base_uri: 'https://api.relay.md',
     api_key: '',
-    vault_base_folder: "relay.md"
+    vault_base_folder: "relay.md",
+    fetch_recent_documents_interval: 5 * 60,
 }
 
 export default class RelayMdPLugin extends Plugin {
     settings: RelayMDSettings;
+    fetch_recent_document_timer: number;
 
     async onload() {
         await this.loadSettings();
@@ -85,10 +88,7 @@ export default class RelayMdPLugin extends Plugin {
             }
         }));
 
-        // Additionally, we register a timer to fetch documents for us
-        this.registerInterval(window.setInterval(() => {
-            this.get_recent_documents();
-        }, 5 * 60 * 1000));  // 5 minutes
+        this.register_timer();
 
         this.addSettingTab(new RelayMDSettingTab(this.app, this));
     }
@@ -161,7 +161,8 @@ export default class RelayMdPLugin extends Plugin {
     async load_document_body(result: any) {
         const id: string = result["relay-document"];
         const filename: string = result["relay-filename"];
-        const relay_to: Array<string> = result["relay-to"]
+        const relay_to: Array<string> = result["relay-to"];
+        const remote_checksum = result["checksum_sha256"];
 
         const options: RequestUrlParam = {
             url: this.settings.base_uri + '/v1/doc/' + id,
@@ -179,8 +180,16 @@ export default class RelayMdPLugin extends Plugin {
         // Let's first see if we maybe have the document already somewhere in the fault
         const located_documents = await this.locate_document(id);
         if (located_documents) {
-            located_documents.forEach((located_document: TFile) => {
-                this.upsert_document(located_document.path, body);
+            located_documents.forEach(async (located_document: TFile) => {
+                // Compare checksum
+                const local_content = await this.app.vault.readBinary(located_document);
+                const checksum = await this.calculateSHA256Checksum(local_content);
+                console.log(checksum);
+                if (checksum != remote_checksum) {
+                    this.upsert_document(located_document.path, body);
+                } else {
+                    console.log("No change detected on " + located_document.path);
+                }
             })
         } else {
             // Loop through team/topics
@@ -191,7 +200,7 @@ export default class RelayMdPLugin extends Plugin {
                 let folder: string = this.settings.vault_base_folder + "/";
                 // We ignore the "_" team which is a "global" team
                 if (team != "_")
-                    folder += team;
+                    folder += team + "/";
                 folder += topic;
                 // Does the folder exist? If not, create it "recursively"
                 if (!(this.app.vault.getAbstractFileByPath(folder) instanceof TFolder)) {
@@ -341,6 +350,7 @@ export default class RelayMdPLugin extends Plugin {
         }
 
         console.log("Successfully sent to " + this.settings.base_uri);
+
         try {
             // WARNING: This overwrites an existing relay-document id potentially,
             // depending on how the server responds. It's a feature, and not a bug and
@@ -405,6 +415,20 @@ export default class RelayMdPLugin extends Plugin {
         return located_files;
     }
 
+    register_timer() {
+        // Additionally, we register a timer to fetch documents for us
+        if (this.fetch_recent_document_timer) {
+            window.clearInterval(
+                this.fetch_recent_document_timer
+            );
+        }
+        this.fetch_recent_document_timer = window.setInterval(() => {
+            this.get_recent_documents();
+        }, this.settings.fetch_recent_documents_interval * 1000);
+
+        this.registerInterval(this.fetch_recent_document_timer);
+    }
+
 }
 
 class RelayMDSettingTab extends PluginSettingTab {
@@ -464,6 +488,23 @@ class RelayMDSettingTab extends PluginSettingTab {
                 .onChange(async (value) => {
                     this.plugin.settings.vault_base_folder = value;
                     await this.plugin.saveSettings();
+                }));
+
+        new Setting(containerEl)
+            .setName('Fetch recent documents interval')
+            .setDesc('How often to look for document updates in seconds')
+            .addText(text => text
+                .setPlaceholder('300')
+                .setValue(this.plugin.settings.fetch_recent_documents_interval.toString())
+                .onChange(async (value) => {
+                    const as_float = parseFloat(value);
+                    if (isNaN(as_float) || !isFinite(+as_float)) {
+                        new Notice("Interval must be an number!")
+                    } else {
+                        this.plugin.settings.fetch_recent_documents_interval = as_float;
+                        await this.plugin.saveSettings();
+                        this.plugin.register_timer();
+                    }
                 }));
     }
 }
