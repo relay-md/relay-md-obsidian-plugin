@@ -13,13 +13,25 @@ import {
     normalizePath
 } from 'obsidian';
 
-
 interface Embed {
     checksum_sha256: string;
     filename: string;
     filesize: number;
     id: string;
 }
+
+/*
+ * Doesn't work because we use "-" in keys in the json api
+interface Document {
+    checksum_sha256: string;
+    embeds: Array<Embed>;
+    filesize: int;
+    relay_document: string;
+    relay_filename: string;
+    relay_title: string;
+    relay_to: string;
+}
+*/
 
 interface RelayMDSettings {
     base_uri: string;
@@ -49,7 +61,8 @@ export default class RelayMdPLugin extends Plugin {
                 return;
             }
             this.settings.api_key = params.token;
-            this.settings.base_uri = DEFAULT_SETTINGS.base_uri; // also potentially reset the base uri
+            //Let's not update this here because we got redirected from the page after clicking anyhow
+            //this.settings.base_uri = DEFAULT_SETTINGS.base_uri; // also potentially reset the base uri
             this.saveSettings();
             new Notice("Access credentials for relay.md have been succesfully installed!");
         });
@@ -150,7 +163,7 @@ export default class RelayMdPLugin extends Plugin {
         const embeds = result.embeds;
         if (embeds) {
             embeds.map((embed: Embed) => {
-                this.load_embeds(embed);
+                this.load_embeds(embed, result);
             });
         }
 
@@ -184,7 +197,6 @@ export default class RelayMdPLugin extends Plugin {
                 // Compare checksum
                 const local_content = await this.app.vault.readBinary(located_document);
                 const checksum = await this.calculateSHA256Checksum(local_content);
-                console.log(checksum);
                 if (checksum != remote_checksum) {
                     this.upsert_document(located_document.path, body);
                 } else {
@@ -211,29 +223,34 @@ export default class RelayMdPLugin extends Plugin {
         }
     }
 
-    async load_embeds(embed: Embed) {
+    async load_embeds(embed: Embed, document) {
         // TODO: think about this for a bit, it allows to update other peoples file by just using the same filename
         // On the other hand, if we were to put the team name into the path, we end up (potentially) having tos
         // duplicate the file into multiple team's attachment folder. Hmm
-        const folder = this.settings.vault_base_folder + "/" + "_attachments"
-        if (!(this.app.vault.getAbstractFileByPath(folder) instanceof TFolder)) {
-            this.make_directory_recursively(folder);
-        }
-        const path = normalizePath(folder + "/" + embed.filename);
-        const file = this.app.vault.getAbstractFileByPath(path);
-        if (!(file instanceof TFile)) {
-            const content = await this.get_embed_binady(embed);
-            this.app.vault.createBinary(path, content);
-            console.log("Binary file " + path + " has been created!");
-        } else {
-            const local_content = await this.app.vault.readBinary(file);
-            const checksum = await this.calculateSHA256Checksum(local_content);
-            if (checksum != embed.checksum_sha256) {
-                const content = await this.get_embed_binady(embed);
-                this.app.vault.modifyBinary(file, content);
-                console.log("Binary file " + path + " has been updated!");
+        document["relay-to"].forEach(async (team_topic: string) => {
+            const parts = team_topic.split("@", 2);
+            const team = parts[1];
+            if (!team) return;
+            const folder = normalizePath(this.settings.vault_base_folder + "/" + team + "/_attachments");
+            if (!(this.app.vault.getAbstractFileByPath(folder) instanceof TFolder)) {
+                this.make_directory_recursively(folder);
             }
-        }
+            const path = normalizePath(folder + "/" + embed.filename);
+            const file = this.app.vault.getAbstractFileByPath(path);
+            if (!(file instanceof TFile)) {
+                const content = await this.get_embed_binady(embed);
+                this.app.vault.createBinary(path, content);
+                console.log("Binary file " + path + " has been created!");
+            } else {
+                const local_content = await this.app.vault.readBinary(file);
+                const checksum = await this.calculateSHA256Checksum(local_content);
+                if (checksum != embed.checksum_sha256) {
+                    const content = await this.get_embed_binady(embed);
+                    this.app.vault.modifyBinary(file, content);
+                    console.log("Binary file " + path + " has been updated!");
+                }
+            }
+        })
     }
 
     async get_embed_binady(embed: Embed) {
@@ -372,8 +389,8 @@ export default class RelayMdPLugin extends Plugin {
         }
         metadata.embeds.map(async (item: any) => {
             let file = this.app.vault.getAbstractFileByPath(item.link);
-            console.log("Uploading attachment: " + item.link);
             if (file instanceof TFile) {
+                console.log("Uploading attachment: " + item.link);
                 this.upload_asset(id, item.link, file);
             }
         });
@@ -397,7 +414,7 @@ export default class RelayMdPLugin extends Plugin {
             new Notice("Relay.md returned an error: " + response.json.error.message);
             return;
         }
-        console.log("Successfully uploaded " + file.path);
+        console.log("Successfully uploaded " + file.path + " as " + response.json.result.id);
     }
 
     async locate_document(document_id: string) {
