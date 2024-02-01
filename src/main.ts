@@ -118,14 +118,15 @@ export default class RelayMdPLugin extends Plugin {
         await this.saveData(this.settings);
     }
 
-    make_directory_recursively(folder: string) {
-        folder.split('/').reduce(
-            (directories, directory) => {
+    make_directory_recursively(path: string) {
+        // path contains the filename as well which could contain a folder. That's why we slice away the last part
+        path.split('/').slice(0, -1).reduce(
+            (directories = "", directory) => {
                 directories += `${directory}/`;
-                if (!(this.app.vault.getAbstractFileByPath(folder) instanceof TFolder)) {
+                if (!(this.app.vault.getAbstractFileByPath(directories) instanceof TFolder)) {
                     this.app.vault.createFolder(directories);
                 }
-                return directories;
+                return directories
             },
             '',
         );
@@ -160,6 +161,8 @@ export default class RelayMdPLugin extends Plugin {
         }
 
         const result = response.json.result;
+
+        // Load embeds
         const embeds = result.embeds;
         if (embeds) {
             embeds.map((embed: Embed) => {
@@ -192,7 +195,7 @@ export default class RelayMdPLugin extends Plugin {
 
         // Let's first see if we maybe have the document already somewhere in the fault
         const located_documents = await this.locate_document(id);
-        if (located_documents) {
+        if (located_documents?.length) {
             located_documents.forEach(async (located_document: TFile) => {
                 // Compare checksum
                 const local_content = await this.app.vault.readBinary(located_document);
@@ -214,16 +217,15 @@ export default class RelayMdPLugin extends Plugin {
                 if (team != "_")
                     folder += team + "/";
                 folder += topic;
+                const path = normalizePath(folder + "/" + filename);
                 // Does the folder exist? If not, create it "recursively"
-                if (!(this.app.vault.getAbstractFileByPath(folder) instanceof TFolder)) {
-                    this.make_directory_recursively(folder);
-                }
-                this.upsert_document(normalizePath(folder + "/" + filename), body);
+                this.make_directory_recursively(path);
+                this.upsert_document(path, body);
             }
         }
     }
 
-    async load_embeds(embed: Embed, document) {
+    async load_embeds(embed: Embed, document: any) {  // document is a dictionary provided by the API with incompatible key names like ("relay-to")
         // TODO: think about this for a bit, it allows to update other peoples file by just using the same filename
         // On the other hand, if we were to put the team name into the path, we end up (potentially) having tos
         // duplicate the file into multiple team's attachment folder. Hmm
@@ -232,16 +234,10 @@ export default class RelayMdPLugin extends Plugin {
             const team = parts[1];
             if (!team) return;
             const folder = normalizePath(this.settings.vault_base_folder + "/" + team + "/_attachments");
-            if (!(this.app.vault.getAbstractFileByPath(folder) instanceof TFolder)) {
-                this.make_directory_recursively(folder);
-            }
             const path = normalizePath(folder + "/" + embed.filename);
+            this.make_directory_recursively(path);
             const file = this.app.vault.getAbstractFileByPath(path);
-            if (!(file instanceof TFile)) {
-                const content = await this.get_embed_binady(embed);
-                this.app.vault.createBinary(path, content);
-                console.log("Binary file " + path + " has been created!");
-            } else {
+            if (file instanceof TFile) {
                 const local_content = await this.app.vault.readBinary(file);
                 const checksum = await this.calculateSHA256Checksum(local_content);
                 if (checksum != embed.checksum_sha256) {
@@ -249,6 +245,10 @@ export default class RelayMdPLugin extends Plugin {
                     this.app.vault.modifyBinary(file, content);
                     console.log("Binary file " + path + " has been updated!");
                 }
+            } else {
+                const content = await this.get_embed_binady(embed);
+                this.app.vault.createBinary(path, content);
+                console.log("Binary file " + path + " has been created!");
             }
         })
     }
@@ -340,7 +340,7 @@ export default class RelayMdPLugin extends Plugin {
 
         // Either we POST a new document or we PUT an existing document
         let method = "POST";
-        let url = this.settings.base_uri + '/v1/doc?filename=' + encodeURIComponent(activeFile.name);
+        let url = this.settings.base_uri + '/v1/doc?filename=' + encodeURIComponent(activeFile.path);
         if (id) {
             method = "PUT"
             url = this.settings.base_uri + '/v1/doc/' + id;
@@ -389,8 +389,12 @@ export default class RelayMdPLugin extends Plugin {
         }
         metadata.embeds.map(async (item: any) => {
             let file = this.app.vault.getAbstractFileByPath(item.link);
-            if (file instanceof TFile) {
-                console.log("Uploading attachment: " + item.link);
+            if (!(file instanceof TFile)) {
+                file = this.app.metadataCache.getFirstLinkpathDest(item.link, "");
+            }
+            if (!file || !(file instanceof TFile)) {
+                console.log(`Embed ${item.link} was not found!`)
+            } else {
                 this.upload_asset(id, item.link, file);
             }
         });
