@@ -34,15 +34,25 @@ interface Document {
 */
 
 interface RelayMDSettings {
+    // Webseite
+    auth_url: string;
+    // API Site
     base_uri: string;
+    // API Access key
     api_key: string;
+    // username that corresponds to the api_key
+    api_username: string;
+    // vault folder to store new files in
     vault_base_folder: string
+    // Interval to check for new documents
     fetch_recent_documents_interval: number
 }
 
 const DEFAULT_SETTINGS: RelayMDSettings = {
+    auth_url: 'https://relay.md',
     base_uri: 'https://api.relay.md',
     api_key: '',
+    api_username: '',
     vault_base_folder: "relay.md",
     fetch_recent_documents_interval: 5 * 60,
 }
@@ -61,8 +71,8 @@ export default class RelayMdPLugin extends Plugin {
                 return;
             }
             this.settings.api_key = params.token;
-            //Let's not update this here because we got redirected from the page after clicking anyhow
-            //this.settings.base_uri = DEFAULT_SETTINGS.base_uri; // also potentially reset the base uri
+            this.settings.api_username = params.username;
+            this.settings.base_uri = params.api_url;
             this.saveSettings();
             new Notice("Access credentials for relay.md have been succesfully installed!");
         });
@@ -156,7 +166,7 @@ export default class RelayMdPLugin extends Plugin {
         const response: RequestUrlResponse = await requestUrl(options);
         if (response.json.error) {
             console.error("API server returned an error");
-            new Notice("Relay.md returned an error: " + response.json.error.message);
+            new Notice("API returned an error: " + response.json.error.message);
             return;
         }
 
@@ -291,7 +301,7 @@ export default class RelayMdPLugin extends Plugin {
         const response: RequestUrlResponse = await requestUrl(options);
         if (response.json.error) {
             console.error("API server returned an error");
-            new Notice("Relay.md returned an error: " + response.json.error.message);
+            new Notice("API returned an error: " + response.json.error.message);
             return;
         }
         try {
@@ -362,7 +372,7 @@ export default class RelayMdPLugin extends Plugin {
         const response: RequestUrlResponse = await requestUrl(options);
         if (response.json.error) {
             console.error("API server returned an error");
-            new Notice("Relay.md returned an error: " + response.json.error.message);
+            new Notice("API returned an error: " + response.json.error.message);
             return;
         }
 
@@ -415,7 +425,7 @@ export default class RelayMdPLugin extends Plugin {
         const response: RequestUrlResponse = await requestUrl(options);
         if (response.json.error) {
             console.error("API server returned an error");
-            new Notice("Relay.md returned an error: " + response.json.error.message);
+            new Notice("API returned an error: " + response.json.error.message);
             return;
         }
         console.log("Successfully uploaded " + file.path + " as " + response.json.result.id);
@@ -466,32 +476,31 @@ class RelayMDSettingTab extends PluginSettingTab {
         containerEl.empty();
 
         new Setting(containerEl)
-            .setName('Base API URI')
-            .setDesc('Base URL for API access')
+            .setName('Authenticate against')
+            .setDesc('Main Website to manage accounts')
             .addText(text => text
-                .setPlaceholder('Enter your API url')
-                .setValue(this.plugin.settings.base_uri)
+                .setPlaceholder('Enter your URL')
+                .setValue(this.plugin.settings.auth_url)
                 .onChange(async (value) => {
-                    this.plugin.settings.base_uri = value;
+                    this.plugin.settings.auth_url = value;
                     await this.plugin.saveSettings();
                 }));
 
         if (!(this.plugin.settings.api_key) || this.plugin.settings.api_key === DEFAULT_SETTINGS.api_key) {
             new Setting(containerEl)
                 .setName('API Access')
-                .setDesc('Authenticate against the relay.md API')
+                .setDesc('Link with your account')
                 .addButton((button) =>
                     button.setButtonText("Obtain access to relay.md").onClick(async () => {
-                        window.open("https://relay.md/configure/obsidian");
-                        //window.open("http://localhost:5000/configure/obsidian");
+                        window.open(this.plugin.settings.auth_url + "/configure/obsidian");
                     })
                 );
         } else {
             new Setting(containerEl)
                 .setName('API Access')
-                .setDesc('Authenticate against the relay.md API')
+                .setDesc(`Logged in as @${this.plugin.settings.api_username}`)
                 .addButton((button) =>
-                    button.setButtonText("reset").onClick(async () => {
+                    button.setButtonText(`Logout!`).onClick(async () => {
                         this.plugin.settings.api_key = DEFAULT_SETTINGS.api_key;
                         await this.plugin.saveSettings();
                         // refresh settings page
