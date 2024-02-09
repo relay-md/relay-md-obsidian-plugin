@@ -29,9 +29,12 @@ __export(main_exports, {
 module.exports = __toCommonJS(main_exports);
 var import_obsidian = require("obsidian");
 var DEFAULT_SETTINGS = {
+  auth_url: "https://relay.md",
   base_uri: "https://api.relay.md",
   api_key: "",
-  vault_base_folder: "relay.md"
+  api_username: "",
+  vault_base_folder: "relay.md",
+  fetch_recent_documents_interval: 5 * 60
 };
 var RelayMdPLugin = class extends import_obsidian.Plugin {
   async onload() {
@@ -41,7 +44,8 @@ var RelayMdPLugin = class extends import_obsidian.Plugin {
         return;
       }
       this.settings.api_key = params.token;
-      this.settings.base_uri = DEFAULT_SETTINGS.base_uri;
+      this.settings.api_username = params.username;
+      this.settings.base_uri = params.api_url;
       this.saveSettings();
       new import_obsidian.Notice("Access credentials for relay.md have been succesfully installed!");
     });
@@ -72,9 +76,7 @@ var RelayMdPLugin = class extends import_obsidian.Plugin {
         this.send_document(file);
       }
     }));
-    this.registerInterval(window.setInterval(() => {
-      this.get_recent_documents();
-    }, 5 * 60 * 1e3));
+    this.register_timer();
     this.addSettingTab(new RelayMDSettingTab(this.app, this));
   }
   onunload() {
@@ -85,31 +87,57 @@ var RelayMdPLugin = class extends import_obsidian.Plugin {
   async saveSettings() {
     await this.saveData(this.settings);
   }
-  async upsert_document(folder, filename, body) {
-    if (!(this.app.vault.getAbstractFileByPath(folder) instanceof import_obsidian.TFolder)) {
-      folder.split("/").reduce(
-        (directories, directory) => {
-          directories += `${directory}/`;
-          try {
-            this.app.vault.createFolder(directories);
-          } catch (e) {
-          }
-          return directories;
-        },
-        ""
-      );
-    }
-    const full_path_to_file = (0, import_obsidian.normalizePath)(folder + "/" + filename);
-    const fileRef = this.app.vault.getAbstractFileByPath(full_path_to_file);
+  make_directory_recursively(path) {
+    path.split("/").slice(0, -1).reduce(
+      (directories = "", directory) => {
+        directories += `${directory}/`;
+        if (!(this.app.vault.getAbstractFileByPath(directories) instanceof import_obsidian.TFolder)) {
+          this.app.vault.createFolder(directories);
+        }
+        return directories;
+      },
+      ""
+    );
+  }
+  async upsert_document(path, body) {
+    const fileRef = this.app.vault.getAbstractFileByPath(path);
     if (fileRef === void 0 || fileRef === null) {
-      await this.app.vault.create(full_path_to_file, body);
-      new import_obsidian.Notice("File " + full_path_to_file + " has been created!");
+      await this.app.vault.create(path, body);
+      new import_obsidian.Notice("File " + path + " has been created!");
     } else if (fileRef instanceof import_obsidian.TFile) {
       await this.app.vault.modify(fileRef, body);
-      new import_obsidian.Notice("File " + full_path_to_file + " has been modified!");
+      new import_obsidian.Notice("File " + path + " has been modified!");
     }
   }
   async load_document(id) {
+    const options = {
+      url: this.settings.base_uri + "/v1/doc/" + id,
+      method: "GET",
+      headers: {
+        "X-API-KEY": this.settings.api_key,
+        "Content-Type": "application/json"
+      }
+    };
+    const response = await (0, import_obsidian.requestUrl)(options);
+    if (response.json.error) {
+      console.error("API server returned an error");
+      new import_obsidian.Notice("API returned an error: " + response.json.error.message);
+      return;
+    }
+    const result = response.json.result;
+    const embeds = result.embeds;
+    if (embeds) {
+      embeds.map((embed) => {
+        this.load_embeds(embed, result);
+      });
+    }
+    this.load_document_body(result);
+  }
+  async load_document_body(result) {
+    const id = result["relay-document"];
+    const filename = result["relay-filename"];
+    const relay_to = result["relay-to"];
+    const remote_checksum = result["checksum_sha256"];
     const options = {
       url: this.settings.base_uri + "/v1/doc/" + id,
       method: "GET",
@@ -119,23 +147,79 @@ var RelayMdPLugin = class extends import_obsidian.Plugin {
       }
     };
     const response = await (0, import_obsidian.requestUrl)(options);
-    try {
-      const filename = response.headers["x-relay-filename"];
-      const relay_to = JSON.parse(response.headers["x-relay-to"]);
-      const body = response.text;
+    const body = response.text;
+    const located_documents = await this.locate_document(id);
+    if (located_documents == null ? void 0 : located_documents.length) {
+      located_documents.forEach(async (located_document) => {
+        const local_content = await this.app.vault.readBinary(located_document);
+        const checksum = await this.calculateSHA256Checksum(local_content);
+        if (checksum != remote_checksum) {
+          this.upsert_document(located_document.path, body);
+        } else {
+          console.log("No change detected on " + located_document.path);
+        }
+      });
+    } else {
       for (const to of relay_to) {
         const tos = to.split("@", 2);
         const team = tos[1];
         const topic = tos[0];
-        let full_path_to_file = this.settings.vault_base_folder + "/";
+        let folder = this.settings.vault_base_folder + "/";
         if (team != "_")
-          full_path_to_file += team + "/";
-        full_path_to_file += topic;
-        this.upsert_document(full_path_to_file, filename, body);
+          folder += team + "/";
+        folder += topic;
+        const path = (0, import_obsidian.normalizePath)(folder + "/" + filename);
+        this.make_directory_recursively(path);
+        this.upsert_document(path, body);
       }
-    } catch (e) {
-      console.log(JSON.stringify(e));
-      throw e;
+    }
+  }
+  async load_embeds(embed, document) {
+    document["relay-to"].forEach(async (team_topic) => {
+      const parts = team_topic.split("@", 2);
+      const team = parts[1];
+      if (!team)
+        return;
+      const folder = (0, import_obsidian.normalizePath)(this.settings.vault_base_folder + "/" + team + "/_attachments");
+      const path = (0, import_obsidian.normalizePath)(folder + "/" + embed.filename);
+      this.make_directory_recursively(path);
+      const file = this.app.vault.getAbstractFileByPath(path);
+      if (file instanceof import_obsidian.TFile) {
+        const local_content = await this.app.vault.readBinary(file);
+        const checksum = await this.calculateSHA256Checksum(local_content);
+        if (checksum != embed.checksum_sha256) {
+          const content = await this.get_embed_binady(embed);
+          this.app.vault.modifyBinary(file, content);
+          console.log("Binary file " + path + " has been updated!");
+        }
+      } else {
+        const content = await this.get_embed_binady(embed);
+        this.app.vault.createBinary(path, content);
+        console.log("Binary file " + path + " has been created!");
+      }
+    });
+  }
+  async get_embed_binady(embed) {
+    const options = {
+      url: this.settings.base_uri + "/v1/assets/" + embed.id,
+      method: "GET",
+      headers: {
+        "X-API-KEY": this.settings.api_key,
+        "Content-Type": "application/octet-stream"
+      }
+    };
+    const response = await (0, import_obsidian.requestUrl)(options);
+    return response.arrayBuffer;
+  }
+  async calculateSHA256Checksum(buffer) {
+    const data = new Uint8Array(buffer);
+    try {
+      const hashBuffer = await window.crypto.subtle.digest("SHA-256", data);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const checksum = hashArray.map((byte) => byte.toString(16).padStart(2, "0")).join("");
+      return checksum;
+    } catch (error) {
+      throw new Error(`Error calculating SHA-256 checksum: ${error}`);
     }
   }
   async get_recent_documents() {
@@ -150,7 +234,7 @@ var RelayMdPLugin = class extends import_obsidian.Plugin {
     const response = await (0, import_obsidian.requestUrl)(options);
     if (response.json.error) {
       console.error("API server returned an error");
-      new import_obsidian.Notice("Relay.md returned an error: " + response.json.error.message);
+      new import_obsidian.Notice("API returned an error: " + response.json.error.message);
       return;
     }
     try {
@@ -174,24 +258,18 @@ var RelayMdPLugin = class extends import_obsidian.Plugin {
     if (!metadata || !metadata.frontmatter) {
       return;
     }
-    if (!("relay-to" in metadata.frontmatter)) {
+    if (!("relay-to" in metadata.frontmatter) || !metadata.frontmatter["relay-to"]) {
       return;
     }
-    if (activeFile.path.startsWith(this.settings.vault_base_folder + "/")) {
-      console.warn(
-        "Files from the relay.md base folder cannot be sent."
-      );
-      return;
-    }
-    const id = metadata.frontmatter["relay-document"];
+    let id = metadata.frontmatter["relay-document"];
     const body = await this.app.vault.cachedRead(activeFile);
     let method = "POST";
-    let url = this.settings.base_uri + "/v1/doc?filename=" + encodeURIComponent(activeFile.name);
+    let url = this.settings.base_uri + "/v1/doc?filename=" + encodeURIComponent(activeFile.path);
     if (id) {
       method = "PUT";
       url = this.settings.base_uri + "/v1/doc/" + id;
     }
-    console.log("Sending API request to api.relay.md (" + method + ")");
+    console.log("Sending API request to " + this.settings.base_uri + " (" + method + ")");
     const options = {
       url,
       method,
@@ -204,40 +282,100 @@ var RelayMdPLugin = class extends import_obsidian.Plugin {
     const response = await (0, import_obsidian.requestUrl)(options);
     if (response.json.error) {
       console.error("API server returned an error");
-      new import_obsidian.Notice("Relay.md returned an error: " + response.json.error.message);
+      new import_obsidian.Notice("API returned an error: " + response.json.error.message);
       return;
     }
+    console.log("Successfully sent to " + this.settings.base_uri);
     try {
-      const doc_id = response.json.result["relay-document"];
-      app.fileManager.processFrontMatter(activeFile, (frontmatter) => {
-        frontmatter["relay-document"] = doc_id;
+      id = response.json.result["relay-document"];
+      this.app.fileManager.processFrontMatter(activeFile, (frontmatter) => {
+        frontmatter["relay-document"] = id;
       });
     } catch (e) {
       console.log(e);
     }
+    if (!metadata.embeds) {
+      return;
+    }
+    metadata.embeds.map(async (item) => {
+      let file = this.app.vault.getAbstractFileByPath(item.link);
+      if (!(file instanceof import_obsidian.TFile)) {
+        file = this.app.metadataCache.getFirstLinkpathDest(item.link, "");
+      }
+      if (!file || !(file instanceof import_obsidian.TFile)) {
+        console.log(`Embed ${item.link} was not found!`);
+      } else {
+        this.upload_asset(id, item.link, file);
+      }
+    });
+  }
+  async upload_asset(id, link, file) {
+    const content = await this.app.vault.readBinary(file);
+    const options = {
+      url: this.settings.base_uri + "/v1/assets/" + id,
+      method: "POST",
+      headers: {
+        "X-API-KEY": this.settings.api_key,
+        "Content-Type": "application/octet-stream",
+        "x-relay-filename": link
+      },
+      body: content
+    };
+    const response = await (0, import_obsidian.requestUrl)(options);
+    if (response.json.error) {
+      console.error("API server returned an error");
+      new import_obsidian.Notice("API returned an error: " + response.json.error.message);
+      return;
+    }
+    console.log("Successfully uploaded " + file.path + " as " + response.json.result.id);
+  }
+  async locate_document(document_id) {
+    const files = this.app.vault.getMarkdownFiles();
+    let located_files = [];
+    for (let i = 0; i < files.length; i++) {
+      const activeFile = files[i];
+      const metadata = this.app.metadataCache.getCache(activeFile.path);
+      if (!metadata || !metadata.frontmatter) {
+        return;
+      }
+      if (metadata.frontmatter["relay-document"] == document_id)
+        located_files.push(activeFile);
+    }
+    return located_files;
+  }
+  register_timer() {
+    if (this.fetch_recent_document_timer) {
+      window.clearInterval(
+        this.fetch_recent_document_timer
+      );
+    }
+    this.fetch_recent_document_timer = window.setInterval(() => {
+      this.get_recent_documents();
+    }, this.settings.fetch_recent_documents_interval * 1e3);
+    this.registerInterval(this.fetch_recent_document_timer);
   }
 };
 var RelayMDSettingTab = class extends import_obsidian.PluginSettingTab {
-  constructor(app2, plugin) {
-    super(app2, plugin);
+  constructor(app, plugin) {
+    super(app, plugin);
     this.plugin = plugin;
   }
   display() {
     const { containerEl } = this;
     containerEl.empty();
-    new import_obsidian.Setting(containerEl).setName("Base API URI").setDesc("Base URL for API access").addText((text) => text.setPlaceholder("Enter your API url").setValue(this.plugin.settings.base_uri).onChange(async (value) => {
-      this.plugin.settings.base_uri = value;
+    new import_obsidian.Setting(containerEl).setName("Authenticate against").setDesc("Main Website to manage accounts").addText((text) => text.setPlaceholder("Enter your URL").setValue(this.plugin.settings.auth_url).onChange(async (value) => {
+      this.plugin.settings.auth_url = value;
       await this.plugin.saveSettings();
     }));
-    if (this.plugin.settings.api_key === DEFAULT_SETTINGS.api_key) {
-      new import_obsidian.Setting(containerEl).setName("API Access").setDesc("Authenticate against the relay.md API").addButton(
+    if (!this.plugin.settings.api_key || this.plugin.settings.api_key === DEFAULT_SETTINGS.api_key) {
+      new import_obsidian.Setting(containerEl).setName("API Access").setDesc("Link with your account").addButton(
         (button) => button.setButtonText("Obtain access to relay.md").onClick(async () => {
-          window.open("https://relay.md/configure/obsidian");
+          window.open(this.plugin.settings.auth_url + "/configure/obsidian");
         })
       );
     } else {
-      new import_obsidian.Setting(containerEl).setName("API Access").setDesc("Authenticate against the relay.md API").addButton(
-        (button) => button.setButtonText("reset").onClick(async () => {
+      new import_obsidian.Setting(containerEl).setName("API Access").setDesc(`Logged in as @${this.plugin.settings.api_username}`).addButton(
+        (button) => button.setButtonText(`Logout!`).onClick(async () => {
           this.plugin.settings.api_key = DEFAULT_SETTINGS.api_key;
           await this.plugin.saveSettings();
           this.display();
@@ -247,6 +385,16 @@ var RelayMDSettingTab = class extends import_obsidian.PluginSettingTab {
     new import_obsidian.Setting(containerEl).setName("Vault relay.md inbox").setDesc("Base folder to synchronize into").addText((text) => text.setPlaceholder("relay.md").setValue(this.plugin.settings.vault_base_folder).onChange(async (value) => {
       this.plugin.settings.vault_base_folder = value;
       await this.plugin.saveSettings();
+    }));
+    new import_obsidian.Setting(containerEl).setName("Fetch recent documents interval").setDesc("How often to look for document updates in seconds").addText((text) => text.setPlaceholder("300").setValue(this.plugin.settings.fetch_recent_documents_interval.toString()).onChange(async (value) => {
+      const as_float = parseFloat(value);
+      if (isNaN(as_float) || !isFinite(+as_float)) {
+        new import_obsidian.Notice("Interval must be an number!");
+      } else {
+        this.plugin.settings.fetch_recent_documents_interval = as_float;
+        await this.plugin.saveSettings();
+        this.plugin.register_timer();
+      }
     }));
   }
 };

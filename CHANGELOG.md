@@ -1,3 +1,18 @@
+# [1.5.0](https://github.com/relay-md/relay-md-obsidian-plugin/compare/1.4.4...1.5.0) (2024-02-09)
+
+
+### Bug Fixes
+
+* transfer assets as binary files ([58b8618](https://github.com/relay-md/relay-md-obsidian-plugin/commit/58b8618f739e8961cad78f9600f62ed1f8529305))
+
+
+### Features
+
+* allow to update a file located somewhere else ([759769d](https://github.com/relay-md/relay-md-obsidian-plugin/commit/759769dd43faa3ec889ad7bb3bd3063f191870e5))
+* **assets:** implement basic asset support ([a0d0fa7](https://github.com/relay-md/relay-md-obsidian-plugin/commit/a0d0fa7451fc0ede7dc26368ddb7c30f85edbad0))
+* download assets into team attachment folder ([4cba688](https://github.com/relay-md/relay-md-obsidian-plugin/commit/4cba6886b229e83346e0dda741fb2041bf69f8ae))
+* support for folders in filename ([d67f115](https://github.com/relay-md/relay-md-obsidian-plugin/commit/d67f115d386a0e4f6cb944fa8af0a33c7e1b2013))
+
 ## [1.4.4](https://github.com/relay-md/relay-md-obsidian-plugin/compare/1.4.3...1.4.4) (2023-12-28)
 
 
