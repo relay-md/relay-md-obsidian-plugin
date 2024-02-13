@@ -28,6 +28,10 @@ export default class RelayMdPLugin extends Plugin {
             this.settings.api_username = params.username;
             this.settings.base_uri = params.api_url;
             this.saveSettings();
+            // Warning, this is undocumented use of display!
+            if (this.app.setting.activeTab) {
+                this.app.setting.activeTab.display();
+            }
             new Notice("Access credentials for relay.md have been succesfully installed!");
         });
 
