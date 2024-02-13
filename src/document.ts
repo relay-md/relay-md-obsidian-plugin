@@ -17,10 +17,12 @@ export interface IDocument {
 export class DocumentRepo {
     plugin: RelayMdPLugin
     api: API
+    embed_repo: EmbedRepo
 
     constructor(plugin: RelayMdPLugin) {
         this.plugin = plugin;
         this.api = new API(this.plugin);
+        this.embed_repo = new EmbedRepo(this.plugin);
     }
 
     async get_recent_documents() {
@@ -39,8 +41,7 @@ export class DocumentRepo {
         const embeds = result.embeds;
         if (embeds) {
             embeds.map((embed: IEmbed) => {
-                // FIXME: 
-                //this.load_embeds(embed, result);
+                this.embed_repo.load_embeds(embed, result);
             });
         }
         this.load_document_body(result);
@@ -191,8 +192,7 @@ export class DocumentRepo {
             if (!file || !(file instanceof TFile)) {
                 console.log(`Embed ${item.link} was not found!`)
             } else {
-                // FIXME:
-                //this.upload_asset(id, item.link, file);
+                this.embed_repo.upload_asset(id, item.link, file);
             }
         });
     }

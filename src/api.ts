@@ -59,8 +59,22 @@ export class API {
         }
         return response;
     }
-    async postRaw(endpoint: string, data: FileUpload, retries = 4) {
-        return null;
+    async postRaw(endpoint: string, body: ArrayBuffer, retries = 4) {
+        const options: RequestUrlParam = {
+            url: this.plugin.settings.base_uri + endpoint,
+            method: 'POST',
+            headers: {
+                'X-API-KEY': this.plugin.settings.api_key,
+            },
+            body: body
+        }
+        const response: RequestUrlResponse = await requestUrl(options);
+        if (response.json.error) {
+            console.error("API server returned an error");
+            new Notice("API returned an error: " + response.json.error.message);
+            return null;
+        }
+        return response;
     }
 
     async put(endpoint: string, body: string, retries = 4) {
