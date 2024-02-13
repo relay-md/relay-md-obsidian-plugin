@@ -1,3 +1,16 @@
+# [1.6.0](https://github.com/relay-md/relay-md-obsidian-plugin/compare/1.5.0...1.6.0) (2024-02-13)
+
+
+### Bug Fixes
+
+* bug ([7ff89d5](https://github.com/relay-md/relay-md-obsidian-plugin/commit/7ff89d54b4c1b03deea9c85d70227183a0365eb3))
+* hugly hack ([20d9986](https://github.com/relay-md/relay-md-obsidian-plugin/commit/20d9986890493035015fad51f59e0c1ea119c365))
+
+
+### Features
+
+* allow to provide api settings manually ([7d4892f](https://github.com/relay-md/relay-md-obsidian-plugin/commit/7d4892f3530218f9b9553de73ab1bbd4e281388f))
+
 # [1.5.0](https://github.com/relay-md/relay-md-obsidian-plugin/compare/1.4.4...1.5.0) (2024-02-09)
 
 
