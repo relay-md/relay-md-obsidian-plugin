@@ -8,7 +8,7 @@ export interface IEmbed {
 }
 
 
-export default class Embed {
+export class EmbedRepo {
     plugin: RelayMdPLugin
 
     constructor(plugin: RelayMdPLugin) {
