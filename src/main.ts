@@ -28,9 +28,11 @@ export default class RelayMdPLugin extends Plugin {
             this.settings.api_username = params.username;
             this.settings.base_uri = params.api_url;
             this.saveSettings();
-            // Warning, this is undocumented use of display!
-            if (this.app.setting.activeTab) {
-                this.app.setting.activeTab.display();
+            // WARNING: this is undocumented use of setting.activeTab.display()!
+            let get_over_complile_error_app: any = this.app;
+            let app_setting: any = get_over_complile_error_app.setting;
+            if (app_setting.activeTab) {
+                app_setting.activeTab.display();
             }
             new Notice("Access credentials for relay.md have been succesfully installed!");
         });
