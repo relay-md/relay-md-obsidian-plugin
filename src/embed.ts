@@ -60,7 +60,7 @@ export class EmbedRepo {
 
     async upload_asset(id: string, link: string, file: TFile) {
         const content = await this.plugin.app.vault.readBinary(file);
-        const response = await this.api.postRaw('/v1/assets/' + id, content)
+        const response = await this.api.postRaw('/v1/assets/' + id + '?filename=' + encodeURIComponent(file.path), content)
         if (!response) return;
         console.log("Successfully uploaded " + file.path + " as " + response.json.result.id);
     }

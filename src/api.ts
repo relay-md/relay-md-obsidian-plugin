@@ -53,7 +53,7 @@ export class API {
         }
         const response: RequestUrlResponse = await requestUrl(options);
         if (response.json.error) {
-            console.error("API server returned an error");
+            console.error("API server returned an error", response.json.error.message);
             new Notice("API returned an error: " + response.json.error.message);
             return null;
         }
@@ -70,7 +70,7 @@ export class API {
         }
         const response: RequestUrlResponse = await requestUrl(options);
         if (response.json.error) {
-            console.error("API server returned an error");
+            console.error("API server returned an error", response.json.error.message);
             new Notice("API returned an error: " + response.json.error.message);
             return null;
         }
@@ -88,7 +88,7 @@ export class API {
         }
         const response: RequestUrlResponse = await requestUrl(options);
         if (response.json.error) {
-            console.error("API server returned an error");
+            console.error("API server returned an error", response.json.error.message);
             new Notice("API returned an error: " + response.json.error.message);
             return null;
         }
@@ -110,7 +110,7 @@ export class API {
         const response: RequestUrlResponse = await requestUrl(options);
         if (content_type == "application/json") {
             if (response.json.error) {
-                console.error("API server returned an error");
+                console.error("API server returned an error", response.json.error.message);
                 new Notice("API returned an error: " + response.json.error.message);
                 return null;
             }

@@ -149,19 +149,14 @@ export class DocumentRepo {
         // Either we POST a new document or we PUT an existing document
         let response;
         if (id) {
-            // In this case, we also need to check if we maybe have to update the assets we originally had in the document as well
-            // TODO: this also means that we may have to delete embeds that have been removed from the note since it has been last
+            // TODO: In this case, we also need to check if we maybe have to update the assets we originally had in the document as well
+            // this also means that we may have to delete embeds that have been removed from the note since it has been last
             // sent to the API
             response = await this.api.put('/v1/doc/' + id, body);
         } else {
             response = await this.api.post('/v1/doc?filename=' + encodeURIComponent(activeFile.path), body);
         }
         if (!response) return;
-        if (response.json.error) {
-            console.error("API server returned an error");
-            new Notice("API returned an error: " + response.json.error.message);
-            return;
-        }
 
         console.log("Successfully sent to " + this.plugin.settings.base_uri);
 
