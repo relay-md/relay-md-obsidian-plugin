@@ -74,8 +74,6 @@ export class RelayMDSettingTab extends PluginSettingTab {
                 .addButton((button) =>
                     button.setButtonText(`Logout!`).onClick(async () => {
                         this.plugin.settings.api_key = DEFAULT_SETTINGS.api_key;
-                        this.plugin.settings.api_username = DEFAULT_SETTINGS.api_username;
-                        this.plugin.settings.base_uri = DEFAULT_SETTINGS.base_uri;
                         await this.plugin.saveSettings();
                         // refresh settings page
                         this.display();
