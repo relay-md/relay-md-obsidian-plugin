@@ -1,3 +1,12 @@
+## [1.6.1](https://github.com/relay-md/relay-md-obsidian-plugin/compare/1.6.0...1.6.1) (2024-02-15)
+
+
+### Bug Fixes
+
+* hugly hack ([beacfa0](https://github.com/relay-md/relay-md-obsidian-plugin/commit/beacfa0c58ce7aa047096ee145af13027c377797))
+* properly located document and do not return early ([9ab7620](https://github.com/relay-md/relay-md-obsidian-plugin/commit/9ab76208286f7b5d9246d27aa9c5177f1f35a8ef))
+* properly located document and do not return early ([1bb1da2](https://github.com/relay-md/relay-md-obsidian-plugin/commit/1bb1da2dd619b184b5dee34e87a7a504ab3d4b6f))
+
 # [1.6.0](https://github.com/relay-md/relay-md-obsidian-plugin/compare/1.5.0...1.6.0) (2024-02-13)
 
 

@@ -358,10 +358,12 @@ var DocumentRepo = class {
       const activeFile = files[i];
       const metadata = this.plugin.app.metadataCache.getCache(activeFile.path);
       if (!metadata || !metadata.frontmatter) {
-        return;
+        continue;
       }
-      if (metadata.frontmatter["relay-document"] == document_id)
+      if (metadata.frontmatter["relay-document"] === document_id) {
+        console.log("Found an existing file with the document id " + document_id);
         located_files.push(activeFile);
+      }
     }
     return located_files;
   }
