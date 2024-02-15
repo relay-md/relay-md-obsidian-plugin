@@ -431,17 +431,19 @@ export default class RelayMdPLugin extends Plugin {
         console.log("Successfully uploaded " + file.path + " as " + response.json.result.id);
     }
 
-    async locate_document(document_id: string) {
+    async locate_document(document_id: string): Promise<Array<TFile> | null> {
         const files = this.app.vault.getMarkdownFiles();
         let located_files: Array<TFile> = [];
         for (let i = 0; i < files.length; i++) {
             const activeFile = files[i];
             const metadata = this.app.metadataCache.getCache(activeFile.path);
             if (!metadata || !metadata.frontmatter) {
-                return;
+                continue;
             }
-            if (metadata.frontmatter["relay-document"] == document_id)
+            if (metadata.frontmatter["relay-document"] === document_id) {
+                console.log("Found an existing file with the document id " + document_id);
                 located_files.push(activeFile);
+            }
         }
         return located_files;
     }
